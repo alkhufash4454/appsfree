@@ -2,6 +2,7 @@ package com.sudani.app.ui.screens
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -9,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
@@ -27,9 +29,11 @@ import com.sudani.app.ui.theme.*
 import com.sudani.app.viewmodel.SudaniViewModel
 
 @Composable
-fun HomeScreenKhufash(viewModel: SudaniViewModel = viewModel()) {
+fun HomeScreenKhufash(
+    viewModel: SudaniViewModel = viewModel(),
+    onSwitchClick: () -> Unit // دالة لفتح قائمة تبديل الحسابات
+) {
     val scrollState = rememberScrollState()
-    // جلب البيانات من الـ ViewModel
     val data = viewModel.dashboardData
     val msisdn = viewModel.msisdn
 
@@ -40,27 +44,36 @@ fun HomeScreenKhufash(viewModel: SudaniViewModel = viewModel()) {
             .verticalScroll(scrollState)
             .padding(bottom = 16.dp)
     ) {
-        // 1. الهيدر العلوي (البيانات متغيرة بناءً على التسجيل)
+        // 1. الهيدر العلوي (الاسم، الرقم، الرصيد)
         HeaderSection(
             name = data?.customerName ?: "مستخدم سوداني",
             phone = msisdn,
-            balance = data?.balance ?: "0.00"
+            balance = data?.balance ?: "0.00",
+            onSwitchClick = onSwitchClick,
+            onRefresh = { viewModel.fetchDashboard() }
         )
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 2. كارت الاستهلاك المتبقي (بيانات ديناميكية)
+        // 2. كارت الاستهلاك المتبقي
         RemainingUsageCard(activeOffers = data?.activeOffers)
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 3. كارت برنامج الولاء (النقاط متغيرة)
+        // 3. كارت برنامج الولاء (النقاط)
         LoyaltyPointsCard(points = data?.totalLoyaltyPoints ?: "0")
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HeaderSection(name: String, phone: String, balance: String) {
+fun HeaderSection(
+    name: String, 
+    phone: String, 
+    balance: String, 
+    onSwitchClick: () -> Unit,
+    onRefresh: () -> Unit
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -84,7 +97,6 @@ fun HeaderSection(name: String, phone: String, balance: String) {
                             .background(KhufashPrimary.copy(alpha = 0.2f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        // عرض أول حرف من الاسم ديناميكياً
                         Text(
                             text = if (name.isNotEmpty()) name.take(1) else "س",
                             color = KhufashPrimary,
@@ -100,17 +112,29 @@ fun HeaderSection(name: String, phone: String, balance: String) {
                     }
                 }
 
+                // كبسولة الرقم أصبحت قابلة للضغط لتبديل الحساب
                 Surface(
+                    onClick = onSwitchClick,
                     shape = RoundedCornerShape(16.dp),
                     color = KhufashBackground.copy(alpha = 0.5f)
                 ) {
-                    Text(
-                        text = phone,
-                        color = TextWhite,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = phone,
+                            color = TextWhite,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Icon(
+                            Icons.Default.ArrowDropDown, 
+                            contentDescription = null, 
+                            tint = TextWhite,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
 
@@ -131,7 +155,7 @@ fun HeaderSection(name: String, phone: String, balance: String) {
                 }
 
                 Button(
-                    onClick = { /* عمل تحديث للبيانات */ },
+                    onClick = onRefresh,
                     colors = ButtonDefaults.buttonColors(containerColor = KhufashPrimary),
                     shape = RoundedCornerShape(20.dp)
                 ) {
@@ -163,9 +187,11 @@ fun RemainingUsageCard(activeOffers: List<com.sudani.app.data.model.ActiveOffer>
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // استخراج البيانات من الـ activeOffers إذا وجدت
-            // ملاحظة: الـ API يرجع قائمة عروض، هنا سنأخذ أول عرض كمثال أو نجمعهم
-            val dataRemaining = activeOffers?.firstOrNull { it.offerName?.contains("MB") == true || it.offerName?.contains("GB") == true }?.remainingVolume ?: "0"
+            // منطق استخراج حجم البيانات من العروض النشطة
+            val dataRemaining = activeOffers?.firstOrNull { 
+                it.offerName?.contains("MB", ignoreCase = true) == true || 
+                it.offerName?.contains("GB", ignoreCase = true) == true 
+            }?.remainingVolume ?: "0"
             
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -202,9 +228,11 @@ fun UsageCircleIndicator(title: String, value: String, unit: String) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoyaltyPointsCard(points: String) {
     Card(
+        onClick = { /* التنقل لصفحة النقاط */ },
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
