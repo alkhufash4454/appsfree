@@ -50,22 +50,36 @@ class SudaniViewModel : ViewModel() {
         }
     }
 
+    // التعديل الجوهري هنا
     fun verifyOtp() {
         viewModelScope.launch {
             _uiState.value = UiState.Loading
             try {
-                val response = repository.verifyOtp(msisdn, otp)
-                if (response.isSuccessful && response.body()?.responseCode == "200") {
-                    val data = response.body()?.data
-                    dashboardData = data
-                    subscriberId = data?.subscriberId
-                    // In a real app, the token comes from headers or a specific field
-                    // For this mock/re-implementation, we'll assume it's successful
-                    isLoggedIn = true
-                    _uiState.value = UiState.Success("تم تسجيل الدخول بنجاح")
-                    fetchDashboard()
+                // 1. التحقق من الـ OTP
+                val verifyResponse = repository.verifyOtp(msisdn, otp)
+                
+                if (verifyResponse.isSuccessful && verifyResponse.body()?.responseCode == "200") {
+                    
+                    // 2. إكمال التسجيل لجلب التوكن
+                    val onboardResponse = repository.completeOnboarding(msisdn, otp)
+                    
+                    if (onboardResponse.isSuccessful && onboardResponse.body()?.responseCode == "200") {
+                        val data = onboardResponse.body()?.data
+                        
+                        // حفظ التوكن بنجاح
+                        token = data?.token
+                        subscriberId = data?.subscriberId
+                        
+                        isLoggedIn = true
+                        _uiState.value = UiState.Success("تم تسجيل الدخول بنجاح")
+                        
+                        // 3. جلب بيانات الداشبورد
+                        fetchDashboard()
+                    } else {
+                        _uiState.value = UiState.Error("فشل في جلب بيانات الحساب")
+                    }
                 } else {
-                    _uiState.value = UiState.Error(response.body()?.responseMessage ?: "رمز التحقق غير صحيح")
+                    _uiState.value = UiState.Error(verifyResponse.body()?.responseMessage ?: "رمز التحقق غير صحيح")
                 }
             } catch (e: Exception) {
                 _uiState.value = UiState.Error("خطأ في الاتصال: ${e.message}")
@@ -74,10 +88,10 @@ class SudaniViewModel : ViewModel() {
     }
 
     fun fetchDashboard() {
-        if (msisdn.isEmpty() || subscriberId == null) return
+        if (msisdn.isEmpty() || subscriberId == null || token == null) return
         viewModelScope.launch {
             try {
-                val response = repository.getDashboard(msisdn, token ?: "", subscriberId!!)
+                val response = repository.getDashboard(msisdn, token!!, subscriberId!!)
                 if (response.isSuccessful && response.body()?.responseCode == "200") {
                     dashboardData = response.body()?.data
                 }
