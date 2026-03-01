@@ -185,7 +185,8 @@ fun DashboardScreen(viewModel: SudaniViewModel) {
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    InfoItem(label = "الرصيد", value = "${data?.balance ?: "0"} SDG", icon = Icons.Default.AccountBalanceWallet)
+                    // تم تغيير الأيقونة هنا إلى Person لتجنب الخطأ
+                    InfoItem(label = "الرصيد", value = "${data?.balance ?: "0"} SDG", icon = Icons.Default.Person)
                     InfoItem(label = "النقاط", value = data?.totalLoyaltyPoints ?: "0", icon = Icons.Default.Star, color = AccentGold)
                 }
             }
@@ -217,14 +218,14 @@ fun DashboardScreen(viewModel: SudaniViewModel) {
             ActionButton(
                 text = "300 ميقا",
                 subText = "70 نقطة",
-                icon = Icons.Default.NetworkCheck,
+                icon = Icons.Default.Done, // تم تغيير الأيقونة هنا
                 modifier = Modifier.weight(1f),
                 onClick = { viewModel.activateOffer("300MB") }
             )
             ActionButton(
                 text = "1 جيجا",
                 subText = "100 نقطة",
-                icon = Icons.Default.SignalCellularAlt,
+                icon = Icons.Default.Call, // تم تغيير الأيقونة هنا
                 modifier = Modifier.weight(1f),
                 onClick = { viewModel.activateOffer("1GB") }
             )
@@ -290,9 +291,11 @@ fun ActionButton(
     color: Color = BluePrimary,
     onClick: () -> Unit
 ) {
+    // تم حل مشكلة الـ API التجريبي بنقل الـ onClick لداخل الـ modifier
     Card(
-        onClick = onClick,
-        modifier = modifier.height(100.dp),
+        modifier = modifier
+            .height(100.dp)
+            .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceDark),
         border = BorderStroke(1.dp, color.copy(alpha = 0.5f))
