@@ -22,11 +22,16 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sudani.app.ui.theme.*
+import com.sudani.app.viewmodel.SudaniViewModel
 
 @Composable
-fun HomeScreenKhufash() {
+fun HomeScreenKhufash(viewModel: SudaniViewModel = viewModel()) {
     val scrollState = rememberScrollState()
+    // جلب البيانات من الـ ViewModel
+    val data = viewModel.dashboardData
+    val msisdn = viewModel.msisdn
 
     Column(
         modifier = Modifier
@@ -35,24 +40,27 @@ fun HomeScreenKhufash() {
             .verticalScroll(scrollState)
             .padding(bottom = 16.dp)
     ) {
-        // 1. الهيدر العلوي (الاسم والرصيد)
-        HeaderSection()
+        // 1. الهيدر العلوي (البيانات متغيرة بناءً على التسجيل)
+        HeaderSection(
+            name = data?.customerName ?: "مستخدم سوداني",
+            phone = msisdn,
+            balance = data?.balance ?: "0.00"
+        )
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 2. كارت الاستهلاك المتبقي (بدون زراير الإضافة)
-        RemainingUsageCard()
+        // 2. كارت الاستهلاك المتبقي (بيانات ديناميكية)
+        RemainingUsageCard(activeOffers = data?.activeOffers)
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 3. كارت برنامج الولاء (النقاط)
-        LoyaltyPointsCard()
+        // 3. كارت برنامج الولاء (النقاط متغيرة)
+        LoyaltyPointsCard(points = data?.totalLoyaltyPoints ?: "0")
     }
 }
 
 @Composable
-fun HeaderSection() {
-    // خلفية زرقاء داكنة متناسقة مع ثيم الخفاش عشان تبرز الهيدر
+fun HeaderSection(name: String, phone: String, balance: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -68,7 +76,6 @@ fun HeaderSection() {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // صورة الحساب (حرف م) والاسم
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
@@ -77,23 +84,28 @@ fun HeaderSection() {
                             .background(KhufashPrimary.copy(alpha = 0.2f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("م", color = KhufashPrimary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        // عرض أول حرف من الاسم ديناميكياً
+                        Text(
+                            text = if (name.isNotEmpty()) name.take(1) else "س",
+                            color = KhufashPrimary,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text("مرحباً،", color = TextGray, fontSize = 14.sp)
-                        Text("مؤمن الفاضل", color = TextWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text(name, color = TextWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         Text("الدفع المقدم", color = KhufashPrimary, fontSize = 12.sp)
                     }
                 }
 
-                // رقم الهاتف
                 Surface(
                     shape = RoundedCornerShape(16.dp),
                     color = KhufashBackground.copy(alpha = 0.5f)
                 ) {
                     Text(
-                        text = "0127610123",
+                        text = phone,
                         color = TextWhite,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                         fontSize = 12.sp,
@@ -104,7 +116,6 @@ fun HeaderSection() {
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // الرصيد وزر الشحن
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -113,20 +124,18 @@ fun HeaderSection() {
                 Column {
                     Text("الرصيد الأساسي", color = TextGray, fontSize = 14.sp)
                     Row(verticalAlignment = Alignment.Bottom) {
-                        Text("1.00", color = TextWhite, fontSize = 36.sp, fontWeight = FontWeight.Bold)
+                        Text(balance, color = TextWhite, fontSize = 36.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("SDG", color = TextGray, fontSize = 16.sp, modifier = Modifier.padding(bottom = 6.dp))
                     }
                 }
 
                 Button(
-                    onClick = { /* إضافة رصيد */ },
+                    onClick = { /* عمل تحديث للبيانات */ },
                     colors = ButtonDefaults.buttonColors(containerColor = KhufashPrimary),
                     shape = RoundedCornerShape(20.dp)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "إضافة رصيد", modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("شحن", fontWeight = FontWeight.Bold)
+                    Text("تحديث", fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -134,7 +143,7 @@ fun HeaderSection() {
 }
 
 @Composable
-fun RemainingUsageCard() {
+fun RemainingUsageCard(activeOffers: List<com.sudani.app.data.model.ActiveOffer>?) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -149,20 +158,20 @@ fun RemainingUsageCard() {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("الاستهلاك المتبقي", color = TextWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("التفاصيل", color = TextGray, fontSize = 12.sp)
-                    Icon(Icons.Default.KeyboardArrowLeft, contentDescription = null, tint = TextGray)
-                }
+                Icon(Icons.Default.KeyboardArrowLeft, contentDescription = null, tint = TextGray)
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // دوائر الاستهلاك (الإنترنت، المكالمات، الرسائل) بدون زراير إضافية
+            // استخراج البيانات من الـ activeOffers إذا وجدت
+            // ملاحظة: الـ API يرجع قائمة عروض، هنا سنأخذ أول عرض كمثال أو نجمعهم
+            val dataRemaining = activeOffers?.firstOrNull { it.offerName?.contains("MB") == true || it.offerName?.contains("GB") == true }?.remainingVolume ?: "0"
+            
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                UsageCircleIndicator(title = "إنترنت", value = "0", unit = "GB")
+                UsageCircleIndicator(title = "إنترنت", value = dataRemaining, unit = "MB")
                 UsageCircleIndicator(title = "مكالمات", value = "0", unit = "دقيقة")
                 UsageCircleIndicator(title = "رسائل", value = "0", unit = "رسالة")
             }
@@ -179,31 +188,27 @@ fun UsageCircleIndicator(title: String, value: String, unit: String) {
             modifier = Modifier.size(80.dp),
             contentAlignment = Alignment.Center
         ) {
-            // الدائرة الرمادية الباهتة (الخلفية)
             Canvas(modifier = Modifier.fillMaxSize()) {
                 drawCircle(
                     color = TextGray.copy(alpha = 0.2f),
                     style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round)
                 )
             }
-            // النصوص داخل الدائرة
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(value, color = TextWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Text(unit, color = TextGray, fontSize = 12.sp)
+                Text(value, color = TextWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(unit, color = TextGray, fontSize = 10.sp)
             }
         }
-        Spacer(modifier = Modifier.height(8.dp))
-        Text("من أصل 0", color = TextGray, fontSize = 10.sp)
     }
 }
 
 @Composable
-fun LoyaltyPointsCard() {
+fun LoyaltyPointsCard(points: String) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        colors = CardDefaults.cardColors(containerColor = KhufashAccent), // اللون الذهبي
+        colors = CardDefaults.cardColors(containerColor = KhufashAccent),
         shape = RoundedCornerShape(24.dp)
     ) {
         Row(
@@ -214,7 +219,6 @@ fun LoyaltyPointsCard() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // دائرة بيضاء بداخلها النجمة
                 Box(
                     modifier = Modifier
                         .size(40.dp)
@@ -222,16 +226,15 @@ fun LoyaltyPointsCard() {
                         .background(Color.White),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Star, contentDescription = "نقاط", tint = KhufashAccent)
+                    Icon(Icons.Default.Star, contentDescription = null, tint = KhufashAccent)
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
                     Text("برنامج الولاء (الخفاش)", color = Color.Black.copy(alpha = 0.7f), fontSize = 14.sp)
-                    Text("1246.0 نقطة", color = Color.Black, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Text("$points نقطة", color = Color.Black, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 }
             }
             
-            // زر عرض الكل
             Surface(
                 color = Color.Black.copy(alpha = 0.1f),
                 shape = RoundedCornerShape(16.dp)
