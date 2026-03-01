@@ -11,7 +11,7 @@ data class SudaniResponse<T>(
 data class DashboardData(
     @SerializedName("subscriberId") val subscriberId: String?,
     @SerializedName("customerName") val customerName: String?,
-    @SerializedName("balance") val balance: String?,
+    @SerializedName("balance") val balance: String?, // قد تحتاج لتعديلها لـ Any أو Object لو السيرفر بيرجعها ككائن
     @SerializedName("totalLoyaltyPoints") val totalLoyaltyPoints: String?,
     @SerializedName("activeOffers") val activeOffers: List<ActiveOffer>?
 )
@@ -20,6 +20,13 @@ data class ActiveOffer(
     @SerializedName("offerName") val offerName: String?,
     @SerializedName("expiryDate") val expiryDate: String?,
     @SerializedName("remainingVolume") val remainingVolume: String?
+)
+
+// الكلاس الجديد اللي ضفناه لاستقبال التوكن
+data class OnboardingData(
+    @SerializedName("token") val token: String?,
+    @SerializedName("subscriberId") val subscriberId: String?,
+    @SerializedName("customerId") val customerId: String?
 )
 
 data class OtpRequest(
