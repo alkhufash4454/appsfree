@@ -70,8 +70,16 @@ dependencies {
     // Coil for image loading
     implementation 'io.coil-kt:coil-compose:2.5.0'
 
-    // السطر ده اللي اتضاف عشان يحل مشكلة الـ Theme
+    // المادة التصميمية (Material)
     implementation 'com.google.android.material:material:1.11.0'
+
+    // ========== المكتبات الجديدة المضافة للتجميع التلقائي والذاكرة ==========
+    // 1. مكتبة WorkManager (للتجميع التلقائي في الخلفية الساعة 2:01 صباحاً)
+    implementation "androidx.work:work-runtime-ktx:2.9.0"
+
+    // 2. مكتبة Gson (لحفظ وإدارة قائمة الـ 10 أرقام في الذاكرة)
+    implementation 'com.google.code.gson:gson:2.10.1'
+    // ==========================================================
 
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
