@@ -47,6 +47,7 @@ android {
 }
 
 dependencies {
+    // Core Android & Compose
     implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.2'
     implementation 'androidx.activity:activity-compose:1.8.1'
@@ -56,28 +57,30 @@ dependencies {
     implementation 'androidx.compose.ui:ui-tooling-preview'
     implementation 'androidx.compose.material3:material3'
     
-    // Retrofit & OkHttp
+    // Retrofit & OkHttp (التعامل مع الـ API)
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
     implementation 'com.squareup.okhttp3:logging-interceptor:4.11.0'
     
-    // Coroutines
+    // Coroutines (العمليات الخلفية)
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
     
-    // Navigation
+    // Navigation (التنقل بين الشاشات)
     implementation 'androidx.navigation:navigation-compose:2.7.5'
     
-    // Coil for image loading
+    // Coil (تحميل الصور)
     implementation 'io.coil-kt:coil-compose:2.5.0'
 
-    // المادة التصميمية (Material)
+    // المادة التصميمية وأيقونات الخفاش الإضافية
     implementation 'com.google.android.material:material:1.11.0'
+    // السطر التالي ضروري جداً لحل مشكلة Unresolved reference: Language و الأيقونات المتقدمة
+    implementation "androidx.compose.material:material-icons-extended"
 
-    // ========== المكتبات الجديدة المضافة للتجميع التلقائي والذاكرة ==========
-    // 1. مكتبة WorkManager (للتجميع التلقائي في الخلفية الساعة 2:01 صباحاً)
+    // ========== مكتبات التجميع التلقائي والذاكرة (الخفاش) ==========
+    // 1. مكتبة WorkManager (للتجميع التلقائي الساعة 2:01 صباحاً)
     implementation "androidx.work:work-runtime-ktx:2.9.0"
 
-    // 2. مكتبة Gson (لحفظ وإدارة قائمة الـ 10 أرقام في الذاكرة)
+    // 2. مكتبة Gson (لحفظ وإدارة قائمة الـ 10 أرقام)
     implementation 'com.google.code.gson:gson:2.10.1'
     // ==========================================================
 
