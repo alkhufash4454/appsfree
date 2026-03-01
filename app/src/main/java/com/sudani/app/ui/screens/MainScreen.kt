@@ -58,16 +58,10 @@ fun KhufashMainScreen() {
         // هنا بيتم عرض الشاشة بناءً على التبويب المختار
         Box(modifier = Modifier.padding(innerPadding)) {
             when (selectedItem) {
-                BottomNavItem.Home -> HomeScreenKhufash() // المرحلة الجاية
-                BottomNavItem.Services -> Text("شاشة الخدمات", color = TextWhite) // Placeholder
-                BottomNavItem.Settings -> Text("شاشة الإعدادات", color = TextWhite) // Placeholder
+                BottomNavItem.Home -> HomeScreenKhufash() // الشاشة الرئيسية اللي عملناها
+                BottomNavItem.Services -> ServicesScreenKhufash() // شاشة الخدمات الجديدة
+                BottomNavItem.Settings -> Text("شاشة الإعدادات قيد الإنشاء 🦇", color = TextWhite) // Placeholder للإعدادات
             }
         }
     }
-}
-
-// مؤقتاً عشان الكود يشتغل معاك بدون أخطاء
-@Composable
-fun HomeScreenKhufash() {
-    Text("شاشة الخفاش الرئيسية قيد الإنشاء 🦇", color = TextWhite)
 }
