@@ -1,10 +1,14 @@
 package com.sudani.app.data.worker
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
+import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.google.gson.Gson
@@ -23,6 +27,7 @@ class ClaimWorker(appContext: Context, workerParams: WorkerParameters) :
     private val gson = Gson()
 
     override suspend fun doWork(): Result = coroutineScope {
+        // جلب قائمة الأرقام المحفوظة
         val json = sharedPrefs.getString("accounts_list", null) ?: return@coroutineScope Result.success()
         val type = object : TypeToken<List<OnboardingData>>() {}.type
         val accounts: List<OnboardingData> = gson.fromJson(json, type)
@@ -30,6 +35,7 @@ class ClaimWorker(appContext: Context, workerParams: WorkerParameters) :
         var totalGained = 0
         var successCount = 0
 
+        // تنفيذ التجميع للأرقام
         val tasks = accounts.map { account ->
             async {
                 try {
@@ -43,6 +49,7 @@ class ClaimWorker(appContext: Context, workerParams: WorkerParameters) :
         }
         tasks.awaitAll()
 
+        // إرسال الإشعار في حالة النجاح
         if (successCount > 0) {
             showNotification(successCount, totalGained)
         }
@@ -53,18 +60,27 @@ class ClaimWorker(appContext: Context, workerParams: WorkerParameters) :
         val channelId = "khufash_claim"
         val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
+        // إنشاء القناة لأندرويد 8 وما فوق
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(channelId, "تجميع الخفاش", NotificationManager.IMPORTANCE_DEFAULT)
             notificationManager.createNotificationChannel(channel)
         }
 
         val notification = NotificationCompat.Builder(applicationContext, channelId)
-            .setSmallIcon(android.R.drawable.star_on)
+            .setSmallIcon(android.R.drawable.star_on) // يفضل استبدالها بأيقونة التطبيق لاحقاً
             .setContentTitle("🦇 تم تجميع نقاط الخفاش")
             .setContentText("نجح التجميع لـ $count أرقام. الإجمالي المكتسب: +$points نقطة")
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .build()
+
+        // حل مشكلة الـ Lint: فحص الصلاحية لأندرويد 13 (API 33) وما فوق
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ActivityCompat.checkSelfPermission(applicationContext, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                // إذا لم تكن الصلاحية موجودة، نتجاهل الإرسال (أو نطلبها من الشاشة الرئيسية)
+                return 
+            }
+        }
 
         notificationManager.notify(1, notification)
     }
