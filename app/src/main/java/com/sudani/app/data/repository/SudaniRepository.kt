@@ -58,9 +58,17 @@ class SudaniRepository {
         VerifyOtpRequest(msisdn, msisdn, otp)
     )
 
+    // الدالة الجديدة
+    suspend fun completeOnboarding(msisdn: String, otp: String) = api.completeOnboarding(
+        getBaseHeaders(msisdn),
+        VerifyOtpRequest(msisdn, msisdn, otp)
+    )
+
     suspend fun getDashboard(msisdn: String, token: String, subscriberId: String) = api.getDashboard(
         getBaseHeaders(msisdn).apply {
             put("Authorization", "Bearer $token")
+            // إضافة x-auth-selfcare-key كما في البايثون
+            put("x-auth-selfcare-key", token) 
         },
         mapOf("subscriberId" to subscriberId)
     )
@@ -68,6 +76,7 @@ class SudaniRepository {
     suspend fun claimPoints(msisdn: String, token: String, currentPoints: String) = api.claimPoints(
         getBaseHeaders(msisdn).apply {
             put("Authorization", "Bearer $token")
+            put("x-auth-selfcare-key", token)
             put("Current-loyalty-points", currentPoints)
         },
         ClaimPointsRequest(currentPoints)
@@ -84,6 +93,7 @@ class SudaniRepository {
     ) = api.redeemOffer(
         getBaseHeaders(msisdn).apply {
             put("Authorization", "Bearer $token")
+            put("x-auth-selfcare-key", token)
             put("Current-loyalty-points", currentPoints)
         },
         RedeemOfferRequest(
