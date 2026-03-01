@@ -1,29 +1,37 @@
 package com.sudani.app.ui.screens
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sudani.app.ui.theme.*
+import com.sudani.app.viewmodel.SudaniViewModel
 
-// تعريف الشاشات السفلية بعد التعديل (3 تابات فقط)
+// 1. تعريف عناصر القائمة السفلية
 sealed class BottomNavItem(val title: String, val icon: ImageVector) {
     object Home : BottomNavItem("الرئيسية", Icons.Default.Home)
     object Services : BottomNavItem("الخدمات", Icons.Default.List)
     object Settings : BottomNavItem("الإعدادات", Icons.Default.Settings)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun KhufashMainScreen() {
+fun KhufashMainScreen(viewModel: SudaniViewModel = viewModel()) {
     var selectedItem by remember { mutableStateOf<BottomNavItem>(BottomNavItem.Home) }
     
-    // القائمة الجديدة المحدثة
+    // حالة التحكم في قائمة تبديل الحسابات
+    val sheetState = rememberModalBottomSheetState()
+    var showSheet by remember { mutableStateOf(false) }
+
     val items = listOf(
         BottomNavItem.Home,
         BottomNavItem.Services,
@@ -55,12 +63,91 @@ fun KhufashMainScreen() {
             }
         }
     ) { innerPadding ->
-        // هنا بيتم عرض الشاشة بناءً على التبويب المختار
         Box(modifier = Modifier.padding(innerPadding)) {
             when (selectedItem) {
-                BottomNavItem.Home -> HomeScreenKhufash() // الشاشة الرئيسية اللي عملناها
-                BottomNavItem.Services -> ServicesScreenKhufash() // شاشة الخدمات الجديدة
-                BottomNavItem.Settings -> Text("شاشة الإعدادات قيد الإنشاء 🦇", color = TextWhite) // Placeholder للإعدادات
+                // مررنا دالة فتح القائمة للشاشة الرئيسية
+                BottomNavItem.Home -> HomeScreenKhufash(
+                    viewModel = viewModel, 
+                    onSwitchClick = { showSheet = true }
+                )
+                BottomNavItem.Services -> ServicesScreenKhufash()
+                BottomNavItem.Settings -> SettingsScreenKhufash(viewModel)
+            }
+        }
+
+        // 2. قائمة تبديل الحسابات (Bottom Sheet)
+        if (showSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showSheet = false },
+                sheetState = sheetState,
+                containerColor = KhufashSurface,
+                dragHandle = { BottomSheetDefaults.DragHandle(color = TextGray) }
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 24.dp, end = 24.dp, bottom = 40.dp)
+                ) {
+                    Text(
+                        "تبديل الحساب (الخفاش)", 
+                        color = TextWhite, 
+                        fontSize = 20.sp, 
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // عرض الأرقام المحفوظة من الـ ViewModel (الذاكرة)
+                    viewModel.savedAccounts.forEach { account ->
+                        val phone = account.customerId ?: "رقم غير معروف"
+                        
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { 
+                                    viewModel.switchAccount(account) 
+                                    showSheet = false 
+                                }
+                                .padding(vertical = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Person, 
+                                contentDescription = null, 
+                                tint = if (phone == viewModel.msisdn) KhufashPrimary else TextGray
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Text(
+                                text = phone,
+                                color = if (phone == viewModel.msisdn) KhufashPrimary else TextWhite,
+                                fontSize = 16.sp,
+                                fontWeight = if (phone == viewModel.msisdn) FontWeight.Bold else FontWeight.Normal
+                            )
+                            if (phone == viewModel.msisdn) {
+                                Spacer(modifier = Modifier.weight(1f))
+                                Icon(Icons.Default.Check, contentDescription = null, tint = SuccessGreen)
+                            }
+                        }
+                        Divider(color = TextGray.copy(alpha = 0.1f))
+                    }
+
+                    // خيار إضافة رقم جديد (يظهر فقط إذا كان العدد أقل من 10)
+                    if (viewModel.savedAccounts.size < 10) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { 
+                                    // هنا يمكنك توجيه المستخدم لصفحة تسجيل دخول جديدة
+                                    showSheet = false 
+                                }
+                                .padding(vertical = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, tint = KhufashAccent)
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Text("إضافة رقم سوداني جديد", color = KhufashAccent, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                }
             }
         }
     }
