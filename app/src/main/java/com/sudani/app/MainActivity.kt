@@ -1,9 +1,13 @@
 package com.sudani.app
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.work.*
 import com.sudani.app.ui.screens.KhufashMainScreen
@@ -29,14 +34,28 @@ import java.util.*
 import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
+
+    // مسجل طلب الصلاحية
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            Toast.makeText(this, "تم تفعيل إشعارات الخفاش 🦇", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "لن تصلك إشعارات التجميع التلقائي", Toast.LENGTH_LONG).show()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // تفعيل جدولة التجميع التلقائي فور تشغيل التطبيق
+        // طلب الصلاحية يدويًا لأندرويد 13+
+        askNotificationPermission()
+
+        // تفعيل جدولة التجميع التلقائي الساعة 2:01 صباحاً
         scheduleDailyClaim(this)
 
         setContent {
-            // استخدام ثيم الخفاش الجديد (Dark Theme)
             KhufashTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -48,7 +67,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // دالة جدولة التجميع التلقائي الساعة 2:01 صباحاً
+    private fun askNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
+
     private fun scheduleDailyClaim(context: android.content.Context) {
         val calendar = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 2)
@@ -90,11 +118,7 @@ fun KhufashTheme(content: @Composable () -> Unit) {
         onSurface = TextWhite,
         onBackground = TextWhite
     )
-
-    MaterialTheme(
-        colorScheme = colorScheme,
-        content = content
-    )
+    MaterialTheme(colorScheme = colorScheme, content = content)
 }
 
 @Composable
@@ -104,12 +128,8 @@ fun AppNavigation(viewModel: SudaniViewModel = viewModel()) {
 
     LaunchedEffect(uiState) {
         when (uiState) {
-            is UiState.Success -> {
-                Toast.makeText(context, (uiState as UiState.Success).message, Toast.LENGTH_SHORT).show()
-            }
-            is UiState.Error -> {
-                Toast.makeText(context, (uiState as UiState.Error).message, Toast.LENGTH_LONG).show()
-            }
+            is UiState.Success -> Toast.makeText(context, uiState.message, Toast.LENGTH_SHORT).show()
+            is UiState.Error -> Toast.makeText(context, uiState.message, Toast.LENGTH_LONG).show()
             else -> {}
         }
     }
@@ -125,25 +145,12 @@ fun AppNavigation(viewModel: SudaniViewModel = viewModel()) {
 @Composable
 fun LoginScreen(viewModel: SudaniViewModel) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(KhufashBackground)
-            .padding(24.dp),
+        modifier = Modifier.fillMaxSize().background(KhufashBackground).padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(
-            text = "تطبيق الخفاش 🦇",
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold,
-            color = KhufashPrimary
-        )
-        Text(
-            text = "سجل دخولك لإدارة أرقامك",
-            fontSize = 14.sp,
-            color = TextGray
-        )
-        
+        Text("تطبيق الخفاش 🦇", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = KhufashPrimary)
+        Text("سجل دخولك لإدارة أرقامك", fontSize = 14.sp, color = TextGray)
         Spacer(modifier = Modifier.height(48.dp))
 
         if (!viewModel.isOtpSent) {
@@ -167,7 +174,7 @@ fun LoginScreen(viewModel: SudaniViewModel) {
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = KhufashPrimary)
             ) {
-                Text("إرسال رمز التحقق", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("إرسال رمز التحقق", fontWeight = FontWeight.Bold)
             }
         } else {
             OutlinedTextField(
@@ -176,11 +183,7 @@ fun LoginScreen(viewModel: SudaniViewModel) {
                 label = { Text("رمز التحقق (6 أرقام)") },
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                singleLine = true,
-                colors = TextFieldDefaults.outlinedTextFieldColors(
-                    focusedBorderColor = KhufashAccent,
-                    unfocusedBorderColor = TextGray
-                )
+                singleLine = true
             )
             Spacer(modifier = Modifier.height(24.dp))
             Button(
@@ -189,9 +192,8 @@ fun LoginScreen(viewModel: SudaniViewModel) {
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen)
             ) {
-                Text("تأكيد وتسجيل الدخول", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("تأكيد وتسجيل الدخول", fontWeight = FontWeight.Bold)
             }
-            
             TextButton(onClick = { viewModel.isOtpSent = false }) {
                 Text("تغيير الرقم؟", color = TextGray)
             }
