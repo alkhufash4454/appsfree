@@ -16,7 +16,14 @@ interface SudaniApiService {
     suspend fun verifyOtp(
         @HeaderMap headers: Map<String, String>,
         @Body request: VerifyOtpRequest
-    ): Response<SudaniResponse<DashboardData>>
+    ): Response<SudaniResponse<Any>> // تعديل هنا
+
+    // المسار الجديد اللي كان ناقص
+    @POST("sc-onboarding/api/customer/onboarding")
+    suspend fun completeOnboarding(
+        @HeaderMap headers: Map<String, String>,
+        @Body request: VerifyOtpRequest
+    ): Response<SudaniResponse<OnboardingData>>
 
     @POST("sc-dashboard/api/get-dashboard")
     suspend fun getDashboard(
