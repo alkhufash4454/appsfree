@@ -4,7 +4,7 @@ import com.google.gson.annotations.SerializedName
 
 /**
  * الموديل العام للردود من سيرفر سوداني
- * [span_1](start_span)يغلف كافة البيانات المستلمة مع كود الحالة والرسالة[span_1](end_span)
+ * [span_0](start_span)يغلف كافة البيانات المستلمة مع كود الحالة والرسالة[span_0](end_span)
  */
 data class SudaniResponse<T>(
     @SerializedName("responseCode") val responseCode: String,
@@ -14,12 +14,12 @@ data class SudaniResponse<T>(
 
 /**
  * بيانات لوحة التحكم (Dashboard)
- * [span_2](start_span)تم تحديثها لتشمل الوحدات المجانية (Free Units) لحساب حجم الإنترنت المتبقي[span_2](end_span)
+ * [span_1](start_span)تم تحديثها لتشمل الوحدات المجانية (Free Units) لحساب حجم الإنترنت المتبقي[span_1](end_span)
  */
 data class DashboardData(
     @SerializedName("subscriberId") val subscriberId: String?,
     @SerializedName("customerName") val customerName: String?,
-    [span_3](start_span)// تم ضبطه كـ Any لأن السيرفر يرسله أحياناً كـ String وأحياناً كـ Object[span_3](end_span)
+    [span_2](start_span)// تم ضبطه كـ Any لأن السيرفر يرسله أحياناً كـ String وأحياناً كـ Object لضمان عدم توقف التطبيق[span_2](end_span)
     @SerializedName("balance") val balance: Any?, 
     @SerializedName("totalLoyaltyPoints") val totalLoyaltyPoints: String?,
     @SerializedName("activeOffers") val activeOffers: List<ActiveOffer>?,
@@ -31,7 +31,7 @@ data class DashboardData(
 
 /**
  * تفاصيل الباقات النشطة (إنترنت، دقائق، رسائل)
- * [span_4](start_span)[span_5](start_span)تستخدم لرسم "الدائرة الحمراء" وحساب النسب المئوية[span_4](end_span)[span_5](end_span)
+ * [span_3](start_span)تستخدم لرسم "الدائرة الحمراء" وحساب النسب المئوية للاستهلاك[span_3](end_span)
  */
 data class FreeUnit(
     @SerializedName("unitName") val unitName: String?,
@@ -48,7 +48,7 @@ data class ActiveOffer(
 
 /**
  * بيانات الجلسة والمشترك الكاملة
- * [span_6](start_span)تخزن في الذاكرة (SharedPreferences) لضمان بقاء 10 أرقام متصلة[span_6](end_span)
+ * [span_4](start_span)تخزن في الذاكرة لضمان بقاء الحسابات متصلة وتعدد الأرقام[span_4](end_span)
  */
 data class OnboardingData(
     @SerializedName("token") val token: String?,
@@ -63,7 +63,7 @@ data class OnboardingData(
     @SerializedName("puk1") val puk1: String?
 )
 
-// --- موديلات الطلبات (Requests) لضمان تطابق الهيدرز مع البوت ---
+// --- موديلات الطلبات (Requests) لضمان تطابق الهيدرز مع منطق البوت ---
 
 data class OtpRequest(
     val msisdn: String,
@@ -89,7 +89,7 @@ data class VerifyOtpRequest(
 
 /**
  * طلب تجميع النقاط
- * [span_7](start_span)يستخدم الهيدر الخاص بـ Current-loyalty-points لضمان قبول السيرفر[span_7](end_span)
+ * [span_5](start_span)يستخدم الهيدر الخاص بالنقاط الحالية لضمان قبول السيرفر للطلب[span_5](end_span)
  */
 data class ClaimPointsRequest(
     @SerializedName("Current-loyalty-points") val currentPoints: String,
@@ -99,7 +99,7 @@ data class ClaimPointsRequest(
 
 /**
  * طلب استبدال النقاط (300MB و 1GB)
- * [span_8](start_span)يتطلب مصفوفة موارد (resources) دقيقة جداً لنجاح العملية[span_8](end_span)
+ * [span_6](start_span)يتطلب مصفوفة موارد (resources) دقيقة جداً لنجاح العملية برمجياً[span_6](end_span)
  */
 data class RedeemOfferRequest(
     val age: String = "1",
@@ -121,7 +121,7 @@ data class OfferResource(
 
 /**
  * موديل الاشتراك بالرصيد النقدي
- * [span_9](start_span)[span_10](start_span)الحقول هنا مصممة لتعكس رد كود 502 في حال نقص الرصيد[span_9](end_span)[span_10](end_span)
+ * [span_7](start_span)الحقول هنا مصممة لتعكس استجابة السيرفر في حال نقص الرصيد (كود 502)[span_7](end_span)
  */
 data class SubscribeServiceRequest(
     val offerId: String,
