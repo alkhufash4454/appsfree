@@ -2,17 +2,13 @@ package com.sudani.app.ui.screens
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -21,17 +17,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sudani.app.ui.theme.*
+import com.sudani.app.viewmodel.ServiceOffering
 import com.sudani.app.viewmodel.SudaniViewModel
 
 @Composable
 fun HomeScreenKhufash(
     viewModel: SudaniViewModel = viewModel(),
-    onSwitchClick: () -> Unit // دالة لفتح قائمة تبديل الحسابات
+    onSwitchClick: () -> Unit
 ) {
     val scrollState = rememberScrollState()
     val data = viewModel.dashboardData
@@ -42,13 +40,13 @@ fun HomeScreenKhufash(
             .fillMaxSize()
             .background(KhufashBackground)
             .verticalScroll(scrollState)
-            .padding(bottom = 16.dp)
+            .padding(bottom = 24.dp)
     ) {
         // 1. الهيدر العلوي (الاسم، الرقم، الرصيد)
         HeaderSection(
             name = data?.customerName ?: "مستخدم سوداني",
             phone = msisdn,
-            balance = data?.balance ?: "0.00",
+            balance = data?.balance?.toString() ?: "0.00",
             onSwitchClick = onSwitchClick,
             onRefresh = { viewModel.fetchDashboard() }
         )
@@ -62,9 +60,116 @@ fun HomeScreenKhufash(
 
         // 3. كارت برنامج الولاء (النقاط)
         LoyaltyPointsCard(points = data?.totalLoyaltyPoints ?: "0")
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // 4. قسم العمليات السريعة (الخفاش) -
+        Text(
+            text = "عمليات سريعة 🦇",
+            color = TextWhite,
+            modifier = Modifier.padding(horizontal = 20.dp),
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // زر تفعيل 300 ميجا (70 نقطة) -
+            QuickActionBtn(
+                title = "300 ميجا",
+                subtitle = "70 نقطة",
+                icon = Icons.Default.Public,
+                modifier = Modifier.weight(1f),
+                onClick = {
+                    val offer300 = ServiceOffering(
+                        offeringId = "320196",
+                        name = "300MB Offer",
+                        category = "Data",
+                        price = "0",
+                        voiceMinutes = "0",
+                        dataMb = "300",
+                        productId = "2002"
+                    )
+                    viewModel.subscribeToService(offer300)
+                }
+            )
+
+            // زر تفعيل 1 جيجا (100 نقطة) -
+            QuickActionBtn(
+                title = "1 جيجا",
+                subtitle = "100 نقطة",
+                icon = Icons.Default.Public,
+                modifier = Modifier.weight(1f),
+                onClick = {
+                    val offer1GB = ServiceOffering(
+                        offeringId = "320197",
+                        name = "1GB Offer",
+                        category = "Data",
+                        price = "0",
+                        voiceMinutes = "0",
+                        dataMb = "1024",
+                        productId = "2023"
+                    )
+                    viewModel.subscribeToService(offer1GB)
+                }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // زر تجميع النقاط اليدوي -
+        Button(
+            onClick = { viewModel.claimPoints() },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .height(56.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Icon(Icons.Default.Star, contentDescription = null, tint = Color.White)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("تجميع نقاط الخفاش الآن", fontWeight = FontWeight.Bold, color = Color.White)
+        }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun QuickActionBtn(
+    title: String, 
+    subtitle: String, 
+    icon: ImageVector, 
+    modifier: Modifier, 
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier.height(100.dp),
+        colors = CardDefaults.cardColors(containerColor = KhufashSurface),
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = KhufashPrimary, modifier = Modifier.size(28.dp))
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(title, color = TextWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text(subtitle, color = KhufashAccent, fontSize = 11.sp)
+        }
+    }
+}
+
+// الكود أدناه يظل كما هو (HeaderSection, RemainingUsageCard, UsageCircleIndicator, LoyaltyPointsCard)
+// تم تعديل HeaderSection ليقبل balance كـ String
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HeaderSection(
@@ -112,7 +217,6 @@ fun HeaderSection(
                     }
                 }
 
-                // كبسولة الرقم أصبحت قابلة للضغط لتبديل الحساب
                 Surface(
                     onClick = onSwitchClick,
                     shape = RoundedCornerShape(16.dp),
@@ -154,12 +258,11 @@ fun HeaderSection(
                     }
                 }
 
-                Button(
+                IconButton(
                     onClick = onRefresh,
-                    colors = ButtonDefaults.buttonColors(containerColor = KhufashPrimary),
-                    shape = RoundedCornerShape(20.dp)
+                    modifier = Modifier.background(KhufashPrimary, CircleShape)
                 ) {
-                    Text("تحديث", fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.Refresh, contentDescription = "تحديث", tint = Color.White)
                 }
             }
         }
@@ -187,7 +290,6 @@ fun RemainingUsageCard(activeOffers: List<com.sudani.app.data.model.ActiveOffer>
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // منطق استخراج حجم البيانات من العروض النشطة
             val dataRemaining = activeOffers?.firstOrNull { 
                 it.offerName?.contains("MB", ignoreCase = true) == true || 
                 it.offerName?.contains("GB", ignoreCase = true) == true 
