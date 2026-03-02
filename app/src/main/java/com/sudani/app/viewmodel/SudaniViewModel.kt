@@ -22,7 +22,6 @@ sealed class UiState {
     data class Error(val message: String) : UiState()
 }
 
-// كلاس لتمثيل الخدمة في Kotlin
 data class ServiceOffering(
     val offeringId: String,
     val name: String,
@@ -41,29 +40,29 @@ class SudaniViewModel(application: Application) : AndroidViewModel(application) 
     private val _uiState = MutableStateFlow<UiState>(UiState.Idle)
     val uiState = _uiState.asStateFlow()
 
-    // بيانات الحسابات
+    // بيانات الحسابات والجلسة
     var savedAccounts by mutableStateOf<List<OnboardingData>>(emptyList())
+    var fullUserData by mutableStateOf<OnboardingData?>(null) // لحفظ الكائن الكامل للهيدرز
+    
     var msisdn by mutableStateOf("")
     var otp by mutableStateOf("")
     var dashboardData by mutableStateOf<DashboardData?>(null)
     var isLoggedIn by mutableStateOf(false)
     var isOtpSent by mutableStateOf(false)
+    
     var token: String? = null
     var subscriberId: String? = null
 
-    // --- قائمة الخدمات (SERVICE_OFFERINGS) ---
+    // قائمة الخدمات (الخفاش)
     val allServices = listOf(
-        // Mixed
         ServiceOffering("243586", "Ahla Youm", "Mixed", "2000", "100", "300", "1570"),
         ServiceOffering("237602", "Raih Balak", "Mixed", "1000", "50", "100", "1699"),
         ServiceOffering("238884", "Raih Balak Max", "Mixed", "28000", "1000", "20480", "1762"),
         ServiceOffering("240891", "Raih Balak", "Mixed", "5200", "500", "1024", "1612"),
         ServiceOffering("238883", "Raih Balak", "Mixed", "18500", "0", "5120", "1763"),
-        // Voice
         ServiceOffering("231232", "Khalli Anak", "Voice", "3700", "300", "0", "1606"),
         ServiceOffering("243979", "Khalli Anak", "Voice", "1500", "45", "0", "1603"),
         ServiceOffering("243980", "Khalli Anak", "Voice", "14000", "1000", "0", "1607"),
-        // Data
         ServiceOffering("244340", "5GB", "Data", "8500", "0", "5120", "2001"),
         ServiceOffering("244341", "10GB", "Data", "12500", "0", "10240", "2002"),
         ServiceOffering("244441", "5GB", "Data", "14000", "0", "5120", "2003"),
@@ -100,24 +99,26 @@ class SudaniViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             _uiState.value = UiState.Loading
             try {
-                val verifyResponse = repository.verifyOtp(msisdn, otp)
-                if (verifyResponse.isSuccessful && verifyResponse.body()?.responseCode == "200") {
-                    val onboardResponse = repository.completeOnboarding(msisdn, otp)
-                    if (onboardResponse.isSuccessful && onboardResponse.body()?.responseCode == "200") {
-                        val data = onboardResponse.body()?.data
+                val verifyRes = repository.verifyOtp(msisdn, otp)
+                if (verifyRes.isSuccessful && verifyRes.body()?.responseCode == "200") {
+                    val onboardRes = repository.completeOnboarding(msisdn, otp)
+                    if (onboardRes.isSuccessful && onboardRes.body()?.responseCode == "200") {
+                        val data = onboardRes.body()?.data
                         if (data != null) {
                             token = data.token
                             subscriberId = data.subscriberId
+                            fullUserData = data // حفظ كائن البيانات الكامل للهيدرز
+                            
                             saveAccount(data, msisdn)
                             isLoggedIn = true
-                            _uiState.value = UiState.Success("تم تسجيل الدخول بنجاح")
+                            _uiState.value = UiState.Success("تم تسجيل الدخول بنجاح 🦇")
                             fetchDashboard()
                         }
                     } else {
                         _uiState.value = UiState.Error("فشل في جلب بيانات التوكن")
                     }
                 } else {
-                    _uiState.value = UiState.Error(verifyResponse.body()?.responseMessage ?: "رمز التحقق خطأ")
+                    _uiState.value = UiState.Error(verifyRes.body()?.responseMessage ?: "رمز التحقق خطأ")
                 }
             } catch (e: Exception) {
                 _uiState.value = UiState.Error("خطأ: ${e.message}")
@@ -128,40 +129,62 @@ class SudaniViewModel(application: Application) : AndroidViewModel(application) 
     // --- العمليات على الداشبورد والخدمات ---
 
     fun fetchDashboard() {
-        if (msisdn.isEmpty() || token == null || subscriberId == null) return
+        val userData = fullUserData
+        if (msisdn.isEmpty() || token == null || userData == null) return
+        
         viewModelScope.launch {
+            _uiState.value = UiState.Loading
             try {
-                val response = repository.getDashboard(msisdn, token!!, subscriberId!!)
+                // استخدام الهيدرز الكاملة لمنع ظهور الأصفار
+                val response = repository.getDashboard(msisdn, token!!, userData)
                 if (response.isSuccessful && response.body()?.responseCode == "200") {
                     dashboardData = response.body()?.data
+                    _uiState.value = UiState.Success("تم تحديث البيانات بنجاح")
+                } else {
+                    _uiState.value = UiState.Error("فشل التحديث: ${response.body()?.responseMessage}")
                 }
-            } catch (e: Exception) { /* Log error */ }
+            } catch (e: Exception) {
+                _uiState.value = UiState.Error("خطأ في الاتصال")
+            }
         }
     }
 
     fun subscribeToService(offering: ServiceOffering) {
-        if (token == null) return
+        val userData = fullUserData
+        if (token == null || userData == null) return
+        
         viewModelScope.launch {
             _uiState.value = UiState.Loading
             try {
-                // ملاحظة: تحتاج لإضافة دالة subscribeService في الـ Repository
-                // استناداً لبيانات البوت: payload = { offerId, product-category, product-price, product-name, product-id }
-                _uiState.value = UiState.Success("جاري تفعيل باقة ${offering.name}...")
-                // هنا يتم استدعاء الـ API الخاص بالاشتراك
+                // إرسال طلب الاشتراك بالرصيد
+                val response = repository.subscribeToService(msisdn, token!!, userData, offering)
+                
+                // معالجة خطأ الرصيد (502 أو 520)
+                if (response.code() == 502 || response.body()?.responseCode == "520") {
+                    _uiState.value = UiState.Error("❌ رصيد غير كافي لتفعيل ${offering.name}")
+                } else if (response.isSuccessful && response.body()?.responseCode == "200") {
+                    _uiState.value = UiState.Success("✅ تم تفعيل ${offering.name} بنجاح")
+                    fetchDashboard()
+                } else {
+                    _uiState.value = UiState.Error(response.body()?.responseMessage ?: "فشل التفعيل")
+                }
             } catch (e: Exception) {
-                _uiState.value = UiState.Error("فشل الاشتراك: ${e.message}")
+                _uiState.value = UiState.Error("خطأ في الاتصال بالسيرفر")
             }
         }
     }
 
     fun claimPoints() {
+        val userData = fullUserData
         val currentPoints = dashboardData?.totalLoyaltyPoints ?: "0"
+        if (token == null || userData == null) return
+        
         viewModelScope.launch {
             _uiState.value = UiState.Loading
             try {
-                val response = repository.claimPoints(msisdn, token ?: "", currentPoints)
+                val response = repository.claimPoints(msisdn, token!!, userData, currentPoints)
                 if (response.isSuccessful && response.body()?.responseCode == "200") {
-                    _uiState.value = UiState.Success("تم تجميع النقاط بنجاح")
+                    _uiState.value = UiState.Success("تم تجميع النقاط بنجاح 🦇")
                     fetchDashboard()
                 } else {
                     _uiState.value = UiState.Error(response.body()?.responseMessage ?: "فشل التجميع")
@@ -196,6 +219,7 @@ class SudaniViewModel(application: Application) : AndroidViewModel(application) 
         msisdn = account.customerId ?: ""
         token = account.token
         subscriberId = account.subscriberId
+        fullUserData = account // استعادة البيانات الكاملة للهيدرز
         isLoggedIn = true
         fetchDashboard()
     }
@@ -208,6 +232,7 @@ class SudaniViewModel(application: Application) : AndroidViewModel(application) 
         isLoggedIn = false
         msisdn = ""
         token = null
+        fullUserData = null
         dashboardData = null
     }
 }
