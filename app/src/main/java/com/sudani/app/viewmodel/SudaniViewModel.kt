@@ -40,9 +40,8 @@ class SudaniViewModel(application: Application) : AndroidViewModel(application) 
     private val _uiState = MutableStateFlow<UiState>(UiState.Idle)
     val uiState = _uiState.asStateFlow()
 
-    // بيانات الحسابات والجلسة
     var savedAccounts by mutableStateOf<List<OnboardingData>>(emptyList())
-    var fullUserData by mutableStateOf<OnboardingData?>(null) // لحفظ الكائن الكامل للهيدرز
+    var fullUserData by mutableStateOf<OnboardingData?>(null)
     
     var msisdn by mutableStateOf("")
     var otp by mutableStateOf("")
@@ -53,30 +52,11 @@ class SudaniViewModel(application: Application) : AndroidViewModel(application) 
     var token: String? = null
     var subscriberId: String? = null
 
-    // قائمة الخدمات (الخفاش)
-    val allServices = listOf(
-        ServiceOffering("243586", "Ahla Youm", "Mixed", "2000", "100", "300", "1570"),
-        ServiceOffering("237602", "Raih Balak", "Mixed", "1000", "50", "100", "1699"),
-        ServiceOffering("238884", "Raih Balak Max", "Mixed", "28000", "1000", "20480", "1762"),
-        ServiceOffering("240891", "Raih Balak", "Mixed", "5200", "500", "1024", "1612"),
-        ServiceOffering("238883", "Raih Balak", "Mixed", "18500", "0", "5120", "1763"),
-        ServiceOffering("231232", "Khalli Anak", "Voice", "3700", "300", "0", "1606"),
-        ServiceOffering("243979", "Khalli Anak", "Voice", "1500", "45", "0", "1603"),
-        ServiceOffering("243980", "Khalli Anak", "Voice", "14000", "1000", "0", "1607"),
-        ServiceOffering("244340", "5GB", "Data", "8500", "0", "5120", "2001"),
-        ServiceOffering("244341", "10GB", "Data", "12500", "0", "10240", "2002"),
-        ServiceOffering("244441", "5GB", "Data", "14000", "0", "5120", "2003"),
-        ServiceOffering("244448", "500MB", "Data", "1700", "0", "500", "2004"),
-        ServiceOffering("239806", "200MB", "Data", "1700", "0", "200", "2005"),
-        ServiceOffering("244449", "1.5GB", "Data", "2500", "0", "1536", "2006"),
-        ServiceOffering("239706", "1GB", "Data", "10304", "0", "1024", "2007")
-    )
-
     init {
         loadAccounts()
     }
 
-    // --- إدارة الحسابات والـ OTP ---
+    // --- إدارة الـ OTP والدخول ---
 
     fun sendOtp() {
         viewModelScope.launch {
@@ -107,95 +87,105 @@ class SudaniViewModel(application: Application) : AndroidViewModel(application) 
                         if (data != null) {
                             token = data.token
                             subscriberId = data.subscriberId
-                            fullUserData = data // حفظ كائن البيانات الكامل للهيدرز
-                            
+                            fullUserData = data
                             saveAccount(data, msisdn)
                             isLoggedIn = true
                             _uiState.value = UiState.Success("تم تسجيل الدخول بنجاح 🦇")
                             fetchDashboard()
                         }
-                    } else {
-                        _uiState.value = UiState.Error("فشل في جلب بيانات التوكن")
                     }
                 } else {
                     _uiState.value = UiState.Error(verifyRes.body()?.responseMessage ?: "رمز التحقق خطأ")
                 }
-            } catch (e: Exception) {
-                _uiState.value = UiState.Error("خطأ: ${e.message}")
-            }
+            } catch (e: Exception) { _uiState.value = UiState.Error("خطأ: ${e.message}") }
         }
     }
 
-    // --- العمليات على الداشبورد والخدمات ---
+    // --- العمليات الحيوية (تلقائية بالكامل من ردود السيرفر) ---
 
     fun fetchDashboard() {
-        val userData = fullUserData
-        if (msisdn.isEmpty() || token == null || userData == null) return
+        val userData = fullUserData ?: return
+        if (msisdn.isEmpty() || token == null) return
         
         viewModelScope.launch {
-            _uiState.value = UiState.Loading
             try {
-                // استخدام الهيدرز الكاملة لمنع ظهور الأصفار
+                // جلب البيانات بالهيدرز الكاملة لضمان عرض الاسم والرصيد الحقيقي
                 val response = repository.getDashboard(msisdn, token!!, userData)
                 if (response.isSuccessful && response.body()?.responseCode == "200") {
                     dashboardData = response.body()?.data
-                    _uiState.value = UiState.Success("تم تحديث البيانات بنجاح")
-                } else {
-                    _uiState.value = UiState.Error("فشل التحديث: ${response.body()?.responseMessage}")
                 }
-            } catch (e: Exception) {
-                _uiState.value = UiState.Error("خطأ في الاتصال")
-            }
+            } catch (e: Exception) { }
         }
     }
 
-    fun subscribeToService(offering: ServiceOffering) {
-        val userData = fullUserData
-        if (token == null || userData == null) return
-        
+    // تفعيل عروض النقاط (300MB و 1GB) - تعتمد على رد السيرفر حصراً
+    fun activateKhufashOffer(type: String) {
+        val userData = fullUserData ?: return
+        // معالجة النقاط: تحويل 1056.0 إلى 1056 لتجنب رفض السيرفر
+        val ptsRaw = dashboardData?.totalLoyaltyPoints ?: "0"
+        val pts = ptsRaw.split(".")[0]
+
         viewModelScope.launch {
             _uiState.value = UiState.Loading
             try {
-                // إرسال طلب الاشتراك بالرصيد
-                val response = repository.subscribeToService(msisdn, token!!, userData, offering)
-                
-                // معالجة خطأ الرصيد (502 أو 520)
-                if (response.code() == 502 || response.body()?.responseCode == "520") {
-                    _uiState.value = UiState.Error("❌ رصيد غير كافي لتفعيل ${offering.name}")
-                } else if (response.isSuccessful && response.body()?.responseCode == "200") {
-                    _uiState.value = UiState.Success("✅ تم تفعيل ${offering.name} بنجاح")
-                    fetchDashboard()
+                val response = if (type == "300mb") {
+                    repository.redeemPointsOffer(msisdn, token!!, userData, pts, "320196", "2002", "300")
+                } else {
+                    repository.redeemPointsOffer(msisdn, token!!, userData, pts, "320197", "2023", "1024")
+                }
+
+                if (response.isSuccessful && response.body()?.responseCode == "200") {
+                    _uiState.value = UiState.Success("تم تفعيل العرض بنجاح 🦇")
+                    fetchDashboard() // تحديث البيانات التلقائي
                 } else {
                     _uiState.value = UiState.Error(response.body()?.responseMessage ?: "فشل التفعيل")
                 }
-            } catch (e: Exception) {
-                _uiState.value = UiState.Error("خطأ في الاتصال بالسيرفر")
-            }
+            } catch (e: Exception) { _uiState.value = UiState.Error("خطأ في الشبكة") }
         }
     }
 
-    fun claimPoints() {
-        val userData = fullUserData
-        val currentPoints = dashboardData?.totalLoyaltyPoints ?: "0"
-        if (token == null || userData == null) return
-        
+    // تجميع النقاط اليدوي - يعرض رد السيرفر المباشر
+    fun claimPointsManual() {
+        val userData = fullUserData ?: return
+        val ptsRaw = dashboardData?.totalLoyaltyPoints ?: "0"
+        val pts = ptsRaw.split(".")[0]
+
         viewModelScope.launch {
             _uiState.value = UiState.Loading
             try {
-                val response = repository.claimPoints(msisdn, token!!, userData, currentPoints)
-                if (response.isSuccessful && response.body()?.responseCode == "200") {
+                val response = repository.claimPoints(msisdn, token!!, userData, pts)
+                val body = response.body()
+                if (response.isSuccessful && body?.responseCode == "200") {
                     _uiState.value = UiState.Success("تم تجميع النقاط بنجاح 🦇")
                     fetchDashboard()
                 } else {
-                    _uiState.value = UiState.Error(response.body()?.responseMessage ?: "فشل التجميع")
+                    // عرض الرد الحقيقي: "أخذتها مسبقاً" أو غيره
+                    _uiState.value = UiState.Error(body?.responseMessage ?: "فشل الطلب")
                 }
-            } catch (e: Exception) {
-                _uiState.value = UiState.Error("خطأ في الاتصال")
-            }
+            } catch (e: Exception) { _uiState.value = UiState.Error("خطأ في الاتصال") }
         }
     }
 
-    // --- إدارة الذاكرة وتعدد الحسابات ---
+    // الاشتراك بالرصيد (منفصل تماماً، يحدد الـ API كود 502 عند نقص الرصيد)
+    fun subscribeWithBalance(service: ServiceOffering) {
+        val userData = fullUserData ?: return
+        viewModelScope.launch {
+            _uiState.value = UiState.Loading
+            try {
+                val res = repository.subscribeToService(msisdn, token!!, userData, service)
+                if (res.code() == 502 || res.body()?.responseCode == "520") {
+                    _uiState.value = UiState.Error("❌ رصيد نقدي غير كافي (502)")
+                } else if (res.isSuccessful && res.body()?.responseCode == "200") {
+                    _uiState.value = UiState.Success("✅ تم الاشتراك في ${service.name} بنجاح")
+                    fetchDashboard()
+                } else {
+                    _uiState.value = UiState.Error(res.body()?.responseMessage ?: "فشل العملية")
+                }
+            } catch (e: Exception) { _uiState.value = UiState.Error("خطأ في السيرفر") }
+        }
+    }
+
+    // --- إدارة الذاكرة وتعدد الحسابات (حفظ واستعادة الجلسة الكاملة) ---
 
     private fun saveAccount(data: OnboardingData, phone: String) {
         val currentList = savedAccounts.toMutableList()
@@ -219,7 +209,7 @@ class SudaniViewModel(application: Application) : AndroidViewModel(application) 
         msisdn = account.customerId ?: ""
         token = account.token
         subscriberId = account.subscriberId
-        fullUserData = account // استعادة البيانات الكاملة للهيدرز
+        fullUserData = account // استعادة البيانات الكاملة للهيدرز لضمان "زيرو أصفار"
         isLoggedIn = true
         fetchDashboard()
     }
