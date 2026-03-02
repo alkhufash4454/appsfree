@@ -7,7 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.Public // أيقونة بديلة للإنترنت لضمان الكومبايل
+import androidx.compose.material.icons.filled.Public 
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
@@ -28,7 +28,7 @@ fun ServicesScreenKhufash(viewModel: SudaniViewModel = viewModel()) {
     var selectedTabIndex by remember { mutableStateOf(0) }
     val tabs = listOf("باقات مميزة", "مكالمات", "إنترنت")
 
-    // تصفية الخدمات بناءً على التبويب المختار من الـ ViewModel
+    // تصفية الخدمات تلقائياً من القائمة الـ 15 المحدثة في الـ ViewModel
     val currentList = when (selectedTabIndex) {
         0 -> viewModel.allServices.filter { it.category == "Mixed" }
         1 -> viewModel.allServices.filter { it.category == "Voice" }
@@ -41,7 +41,7 @@ fun ServicesScreenKhufash(viewModel: SudaniViewModel = viewModel()) {
             .fillMaxSize()
             .background(KhufashBackground)
     ) {
-        // شريط العنوان العلوي
+        // شريط العنوان العلوي (The Bat Style)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -54,7 +54,7 @@ fun ServicesScreenKhufash(viewModel: SudaniViewModel = viewModel()) {
             Icon(Icons.Default.Search, contentDescription = "بحث", tint = TextWhite)
         }
 
-        // شريط التبويبات (Tabs)
+        // شريط التبويبات المتفاعل مع ثيم الخفاش
         TabRow(
             selectedTabIndex = selectedTabIndex,
             containerColor = KhufashBackground,
@@ -82,14 +82,15 @@ fun ServicesScreenKhufash(viewModel: SudaniViewModel = viewModel()) {
             }
         }
 
-        // قائمة الكروت الديناميكية
+        // قائمة الكروت الديناميكية التي تعتمد على استجابة السيرفر
         LazyColumn(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             items(currentList) { service ->
                 KhufashServiceCard(service) {
-                    viewModel.subscribeToService(service)
+                    // استدعاء منطق الاشتراك بالرصيد الذي يعالج كود 502 تلقائياً
+                    viewModel.subscribeWithBalance(service)
                 }
             }
         }
@@ -104,10 +105,14 @@ fun KhufashServiceCard(service: ServiceOffering, onSubscribe: () -> Unit) {
         modifier = Modifier.fillMaxWidth()
     ) {
         Column {
-            // الجزء العلوي: التفاصيل
             Column(modifier = Modifier.padding(20.dp)) {
+                // تصنيف الباقة بناءً على منطق البوت
                 Text(
-                    text = if (service.category == "Mixed") "صالح لمدة يوم" else "باقة مخصصة", 
+                    text = when(service.category) {
+                        "Mixed" -> "🎁 عرض مميز"
+                        "Voice" -> "📞 باقة مكالمات"
+                        else -> "📶 باقة إنترنت"
+                    }, 
                     color = KhufashPrimary, 
                     fontSize = 12.sp, 
                     fontWeight = FontWeight.Bold
@@ -118,33 +123,34 @@ fun KhufashServiceCard(service: ServiceOffering, onSubscribe: () -> Unit) {
                 Spacer(modifier = Modifier.height(20.dp))
                 
                 Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
-                    // بيانات الإنترنت
+                    // بيانات الإنترنت المتبقية (تلقائي)
                     if (service.dataMb != "0") {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Public, contentDescription = null, tint = TextGray, modifier = Modifier.size(24.dp))
+                            Icon(Icons.Default.Public, null, tint = TextGray, modifier = Modifier.size(24.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
-                                Text("${service.dataMb} MB", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                val displayMb = if (service.dataMb.toInt() >= 1024) "${service.dataMb.toInt()/1024} GB" else "${service.dataMb} MB"
+                                Text(displayMb, color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                                 Text("إنترنت", color = TextGray, fontSize = 11.sp)
                             }
                         }
                     }
                     
-                    // بيانات المكالمات
+                    // بيانات المكالمات (تلقائي)
                     if (service.voiceMinutes != "0") {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Call, contentDescription = null, tint = TextGray, modifier = Modifier.size(24.dp))
+                            Icon(Icons.Default.Call, null, tint = TextGray, modifier = Modifier.size(24.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
-                                Text(service.voiceMinutes, color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                Text("دقيقة", color = TextGray, fontSize = 11.sp)
+                                Text("${service.voiceMinutes} د", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                Text("مكالمات", color = TextGray, fontSize = 11.sp)
                             }
                         }
                     }
                 }
             }
 
-            // الجزء السفلي: السعر والاشتراك
+            // شريط السعر والاشتراك (محرك الـ API)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -158,6 +164,7 @@ fun KhufashServiceCard(service: ServiceOffering, onSubscribe: () -> Unit) {
                 ) {
                     Column {
                         Row(verticalAlignment = Alignment.Bottom) {
+                            // عرض السعر الحقيقي المطلوب من السيرفر
                             Text(service.price, color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("SDG", color = TextWhite, fontSize = 12.sp, modifier = Modifier.padding(bottom = 2.dp))
@@ -166,11 +173,11 @@ fun KhufashServiceCard(service: ServiceOffering, onSubscribe: () -> Unit) {
 
                     Button(
                         onClick = onSubscribe,
-                        colors = ButtonDefaults.buttonColors(containerColor = TextWhite),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
                         shape = RoundedCornerShape(20.dp),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                     ) {
-                        Text("اشتراك", color = KhufashPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("تفعيل", color = KhufashPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
                 }
             }
