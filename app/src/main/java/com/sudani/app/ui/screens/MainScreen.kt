@@ -1,5 +1,6 @@
 package com.sudani.app.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -16,7 +17,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sudani.app.ui.theme.*
 import com.sudani.app.viewmodel.SudaniViewModel
 
-// 1. تعريف عناصر القائمة السفلية
+// تعريف عناصر القائمة السفلية
 sealed class BottomNavItem(val title: String, val icon: ImageVector) {
     object Home : BottomNavItem("الرئيسية", Icons.Default.Home)
     object Services : BottomNavItem("الخدمات", Icons.Default.List)
@@ -65,17 +66,19 @@ fun KhufashMainScreen(viewModel: SudaniViewModel = viewModel()) {
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             when (selectedItem) {
-                // مررنا دالة فتح القائمة للشاشة الرئيسية
+                // الشاشة الرئيسية مع دعم زر التحديث وتبديل الحسابات
                 BottomNavItem.Home -> HomeScreenKhufash(
                     viewModel = viewModel, 
                     onSwitchClick = { showSheet = true }
                 )
-                BottomNavItem.Services -> ServicesScreenKhufash()
-                BottomNavItem.Settings -> SettingsScreenKhufash(viewModel)
+                // شاشة الخدمات المحدثة بالـ 15 خدمة
+                BottomNavItem.Services -> ServicesScreenKhufash(viewModel = viewModel)
+                // شاشة الإعدادات لإدارة الحسابات
+                BottomNavItem.Settings -> SettingsScreenKhufash(viewModel = viewModel)
             }
         }
 
-        // 2. قائمة تبديل الحسابات (Bottom Sheet)
+        // قائمة تبديل الحسابات (Bottom Sheet) -
         if (showSheet) {
             ModalBottomSheet(
                 onDismissRequest = { showSheet = false },
@@ -89,14 +92,14 @@ fun KhufashMainScreen(viewModel: SudaniViewModel = viewModel()) {
                         .padding(start = 24.dp, end = 24.dp, bottom = 40.dp)
                 ) {
                     Text(
-                        "تبديل الحساب (الخفاش)", 
+                        "تبديل الحساب (الخفاش) 🦇", 
                         color = TextWhite, 
                         fontSize = 20.sp, 
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // عرض الأرقام المحفوظة من الـ ViewModel (الذاكرة)
+                    // عرض الأرقام الـ 10 المحفوظة
                     viewModel.savedAccounts.forEach { account ->
                         val phone = account.customerId ?: "رقم غير معروف"
                         
@@ -104,7 +107,7 @@ fun KhufashMainScreen(viewModel: SudaniViewModel = viewModel()) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { 
-                                    viewModel.switchAccount(account) 
+                                    viewModel.switchAccount(account) // تبديل الحساب واستعادة التوكن
                                     showSheet = false 
                                 }
                                 .padding(vertical = 16.dp),
@@ -130,13 +133,14 @@ fun KhufashMainScreen(viewModel: SudaniViewModel = viewModel()) {
                         Divider(color = TextGray.copy(alpha = 0.1f))
                     }
 
-                    // خيار إضافة رقم جديد (يظهر فقط إذا كان العدد أقل من 10)
+                    // خيار إضافة رقم جديد (حتى 10 أرقام)
                     if (viewModel.savedAccounts.size < 10) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { 
-                                    // هنا يمكنك توجيه المستخدم لصفحة تسجيل دخول جديدة
+                                    viewModel.isLoggedIn = false
+                                    viewModel.isOtpSent = false
                                     showSheet = false 
                                 }
                                 .padding(vertical = 16.dp),
