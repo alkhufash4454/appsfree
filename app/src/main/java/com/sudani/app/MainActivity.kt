@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
 
+    // مسجل طلب الصلاحية
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
@@ -45,12 +46,20 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // 1. طلب الصلاحية يدويًا
         askNotificationPermission()
+
+        // 2. جدولة التجميع التلقائي
         scheduleDailyClaim(this)
 
         setContent {
-            KhufashTheme {
-                Surface(modifier = Modifier.fillMaxSize(), color = KhufashBackground) {
+            // الحل الجذري: تأكد أن KhufashTheme معرفة هنا أو استبدلها بـ SudaniAppTheme
+            KhufashTheme { 
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = KhufashBackground
+                ) {
                     AppNavigation()
                 }
             }
@@ -59,7 +68,8 @@ class MainActivity : ComponentActivity() {
 
     private fun askNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOT_NOTIFICATIONS) !=
+            // تصحيح الخطأ الإملائي: POST_NOTIFICATIONS بدلاً من POST_NOT_NOTIFICATIONS
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
                 PackageManager.PERMISSION_GRANTED
             ) {
                 requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -71,15 +81,39 @@ class MainActivity : ComponentActivity() {
         val calendar = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 2)
             set(Calendar.MINUTE, 1)
-            if (before(Calendar.getInstance())) add(Calendar.DAY_OF_MONTH, 1)
+            if (before(Calendar.getInstance())) {
+                add(Calendar.DAY_OF_MONTH, 1)
+            }
         }
+
         val timeDiff = calendar.timeInMillis - System.currentTimeMillis()
+
         val claimRequest = PeriodicWorkRequestBuilder<ClaimWorker>(24, TimeUnit.HOURS)
             .setInitialDelay(timeDiff, TimeUnit.MILLISECONDS)
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .build()
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork("KhufashAutoClaim", ExistingPeriodicWorkPolicy.KEEP, claimRequest)
+
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            "KhufashAutoClaim",
+            ExistingPeriodicWorkPolicy.KEEP,
+            claimRequest
+        )
     }
+}
+
+// تعريف الثيم مباشرة لحل مشكلة Unresolved reference
+@Composable
+fun KhufashTheme(content: @Composable () -> Unit) {
+    val colorScheme = darkColorScheme(
+        primary = KhufashPrimary,
+        surface = KhufashSurface,
+        background = KhufashBackground,
+        tertiary = KhufashAccent,
+        onPrimary = Color.White,
+        onSurface = TextWhite,
+        onBackground = TextWhite
+    )
+    MaterialTheme(colorScheme = colorScheme, content = content)
 }
 
 @Composable
@@ -88,7 +122,6 @@ fun AppNavigation(viewModel: SudaniViewModel = viewModel()) {
     val context = LocalContext.current
 
     LaunchedEffect(uiState) {
-        // حل مشكلة Smart Cast: تخزين الحالة في متغير ثابت
         val currentState = uiState 
         when (currentState) {
             is UiState.Success -> Toast.makeText(context, currentState.message, Toast.LENGTH_SHORT).show()
@@ -97,7 +130,63 @@ fun AppNavigation(viewModel: SudaniViewModel = viewModel()) {
         }
     }
 
-    if (!viewModel.isLoggedIn) LoginScreen(viewModel) else KhufashMainScreen(viewModel)
+    if (!viewModel.isLoggedIn) {
+        LoginScreen(viewModel)
+    } else {
+        KhufashMainScreen(viewModel)
+    }
 }
 
-// ... كود LoginScreen يظل كما هو مع التأكد من الـ imports
+// الحل الجذري: تعريف شاشة الدخول هنا لضمان وجود المرجع
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LoginScreen(viewModel: SudaniViewModel) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(KhufashBackground)
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text("تطبيق الخفاش 🦇", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = KhufashPrimary)
+        Spacer(modifier = Modifier.height(48.dp))
+
+        if (!viewModel.isOtpSent) {
+            OutlinedTextField(
+                value = viewModel.msisdn,
+                onValueChange = { if (it.length <= 10) viewModel.msisdn = it },
+                label = { Text("رقم الهاتف") },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            Button(
+                onClick = { viewModel.sendOtp() },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text("إرسال رمز التحقق")
+            }
+        } else {
+            OutlinedTextField(
+                value = viewModel.otp,
+                onValueChange = { viewModel.otp = it },
+                label = { Text("رمز التحقق") },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            Button(
+                onClick = { viewModel.verifyOtp() },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen)
+            ) {
+                Text("تأكيد الدخول")
+            }
+        }
+    }
+}
