@@ -22,8 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.sudani.app.data.model.FreeUnit
 import com.sudani.app.ui.theme.*
-import com.sudani.app.viewmodel.ServiceOffering
 import com.sudani.app.viewmodel.SudaniViewModel
 
 @Composable
@@ -42,7 +42,7 @@ fun HomeScreenKhufash(
             .verticalScroll(scrollState)
             .padding(bottom = 24.dp)
     ) {
-        // 1. الهيدر العلوي (الاسم، الرقم، الرصيد)
+        // 1. الهيدر العلوي الديناميكي (الاسم، الرقم، الرصيد من رد السيرفر)
         HeaderSection(
             name = data?.customerName ?: "مستخدم سوداني",
             phone = msisdn,
@@ -53,17 +53,20 @@ fun HomeScreenKhufash(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 2. كارت الاستهلاك المتبقي
-        RemainingUsageCard(activeOffers = data?.activeOffers)
+        // 2. كارت الاستهلاك المتبقي (الدائرة الحمراء للإنترنت)
+        RemainingUsageCard(freeUnits = data?.freeUnits)
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 3. كارت برنامج الولاء (النقاط)
-        LoyaltyPointsCard(points = data?.totalLoyaltyPoints ?: "0")
+        // 3. كارت برنامج الولاء (النقاط المتغيرة تلقائياً)
+        LoyaltyPointsCard(
+            points = data?.totalLoyaltyPoints ?: "0",
+            onClaimClick = { viewModel.claimPointsManual() }
+        )
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 4. قسم العمليات السريعة (الخفاش) -
+        // 4. قسم العمليات السريعة (عروض النقاط حصراً)
         Text(
             text = "عمليات سريعة 🦇",
             color = TextWhite,
@@ -80,52 +83,30 @@ fun HomeScreenKhufash(
                 .padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // زر تفعيل 300 ميجا (70 نقطة) -
+            // زر 300 ميجا بنظام النقاط
             QuickActionBtn(
                 title = "300 ميجا",
                 subtitle = "70 نقطة",
                 icon = Icons.Default.Public,
                 modifier = Modifier.weight(1f),
-                onClick = {
-                    val offer300 = ServiceOffering(
-                        offeringId = "320196",
-                        name = "300MB Offer",
-                        category = "Data",
-                        price = "0",
-                        voiceMinutes = "0",
-                        dataMb = "300",
-                        productId = "2002"
-                    )
-                    viewModel.subscribeToService(offer300)
-                }
+                onClick = { viewModel.activateKhufashOffer("300mb") }
             )
 
-            // زر تفعيل 1 جيجا (100 نقطة) -
+            // زر 1 قيقا بنظام النقاط
             QuickActionBtn(
                 title = "1 جيجا",
                 subtitle = "100 نقطة",
                 icon = Icons.Default.Public,
                 modifier = Modifier.weight(1f),
-                onClick = {
-                    val offer1GB = ServiceOffering(
-                        offeringId = "320197",
-                        name = "1GB Offer",
-                        category = "Data",
-                        price = "0",
-                        voiceMinutes = "0",
-                        dataMb = "1024",
-                        productId = "2023"
-                    )
-                    viewModel.subscribeToService(offer1GB)
-                }
+                onClick = { viewModel.activateKhufashOffer("1gb") }
             )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // زر تجميع النقاط اليدوي -
+        // زر تجميع النقاط اليدوي (يظهر رد السيرفر المباشر)
         Button(
-            onClick = { viewModel.claimPoints() },
+            onClick = { viewModel.claimPointsManual() },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
@@ -140,137 +121,8 @@ fun HomeScreenKhufash(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun QuickActionBtn(
-    title: String, 
-    subtitle: String, 
-    icon: ImageVector, 
-    modifier: Modifier, 
-    onClick: () -> Unit
-) {
-    Card(
-        onClick = onClick,
-        modifier = modifier.height(100.dp),
-        colors = CardDefaults.cardColors(containerColor = KhufashSurface),
-        shape = RoundedCornerShape(20.dp)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(icon, contentDescription = null, tint = KhufashPrimary, modifier = Modifier.size(28.dp))
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(title, color = TextWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            Text(subtitle, color = KhufashAccent, fontSize = 11.sp)
-        }
-    }
-}
-
-// الكود أدناه يظل كما هو (HeaderSection, RemainingUsageCard, UsageCircleIndicator, LoyaltyPointsCard)
-// تم تعديل HeaderSection ليقبل balance كـ String
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun HeaderSection(
-    name: String, 
-    phone: String, 
-    balance: String, 
-    onSwitchClick: () -> Unit,
-    onRefresh: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                color = KhufashSurface,
-                shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)
-            )
-            .padding(top = 48.dp, bottom = 32.dp, start = 24.dp, end = 24.dp)
-    ) {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(50.dp)
-                            .clip(CircleShape)
-                            .background(KhufashPrimary.copy(alpha = 0.2f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (name.isNotEmpty()) name.take(1) else "س",
-                            color = KhufashPrimary,
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Text("مرحباً،", color = TextGray, fontSize = 14.sp)
-                        Text(name, color = TextWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                        Text("الدفع المقدم", color = KhufashPrimary, fontSize = 12.sp)
-                    }
-                }
-
-                Surface(
-                    onClick = onSwitchClick,
-                    shape = RoundedCornerShape(16.dp),
-                    color = KhufashBackground.copy(alpha = 0.5f)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = phone,
-                            color = TextWhite,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Icon(
-                            Icons.Default.ArrowDropDown, 
-                            contentDescription = null, 
-                            tint = TextWhite,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                Column {
-                    Text("الرصيد الأساسي", color = TextGray, fontSize = 14.sp)
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text(balance, color = TextWhite, fontSize = 36.sp, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("SDG", color = TextGray, fontSize = 16.sp, modifier = Modifier.padding(bottom = 6.dp))
-                    }
-                }
-
-                IconButton(
-                    onClick = onRefresh,
-                    modifier = Modifier.background(KhufashPrimary, CircleShape)
-                ) {
-                    Icon(Icons.Default.Refresh, contentDescription = "تحديث", tint = Color.White)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun RemainingUsageCard(activeOffers: List<com.sudani.app.data.model.ActiveOffer>?) {
+fun RemainingUsageCard(freeUnits: List<FreeUnit>?) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -279,52 +131,104 @@ fun RemainingUsageCard(activeOffers: List<com.sudani.app.data.model.ActiveOffer>
         shape = RoundedCornerShape(24.dp)
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("الاستهلاك المتبقي", color = TextWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Icon(Icons.Default.KeyboardArrowLeft, contentDescription = null, tint = TextGray)
-            }
+            Text("الاستهلاك المتبقي", color = TextWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
 
             Spacer(modifier = Modifier.height(24.dp))
-
-            val dataRemaining = activeOffers?.firstOrNull { 
-                it.offerName?.contains("MB", ignoreCase = true) == true || 
-                it.offerName?.contains("GB", ignoreCase = true) == true 
-            }?.remainingVolume ?: "0"
             
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                UsageCircleIndicator(title = "إنترنت", value = dataRemaining, unit = "MB")
-                UsageCircleIndicator(title = "مكالمات", value = "0", unit = "دقيقة")
-                UsageCircleIndicator(title = "رسائل", value = "0", unit = "رسالة")
+                // الدائرة الحمراء للإنترنت - تحاكي منطق البوت
+                UsageCircleIndicator(title = "إنترنت", freeUnits = freeUnits, isInternet = true)
+                UsageCircleIndicator(title = "مكالمات", freeUnits = freeUnits, isInternet = false)
+                UsageCircleIndicator(title = "رسائل", freeUnits = freeUnits, isInternet = false)
             }
         }
     }
 }
 
 @Composable
-fun UsageCircleIndicator(title: String, value: String, unit: String) {
+fun UsageCircleIndicator(title: String, freeUnits: List<FreeUnit>?, isInternet: Boolean) {
+    // البحث التلقائي في رد السيرفر عن حجم البيانات
+    val unit = if (isInternet) {
+        freeUnits?.find { 
+            it.unitName?.contains("إنترنت") == true || 
+            it.measureUnit?.contains("MB") == true || 
+            it.measureUnit?.contains("GB") == true 
+        }
+    } else null
+
+    val cur = unit?.currentAmount?.toFloatOrNull() ?: 0f
+    val tot = unit?.totalAmount?.toFloatOrNull() ?: 1f
+    val percentage = if (tot > 0) (cur / tot) else 0f
+    
+    // تنسيق العرض (مثلاً 0.29 GB)
+    val displayValue = when {
+        cur >= 1024 -> "${String.format("%.2f", cur / 1024)} GB"
+        cur > 0 -> "${cur.toInt()} MB"
+        else -> "0 MB"
+    }
+
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(title, color = TextWhite, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Text(title, color = TextWhite, fontSize = 14.sp)
         Spacer(modifier = Modifier.height(12.dp))
-        Box(
-            modifier = Modifier.size(80.dp),
-            contentAlignment = Alignment.Center
-        ) {
+        Box(modifier = Modifier.size(80.dp), contentAlignment = Alignment.Center) {
             Canvas(modifier = Modifier.fillMaxSize()) {
-                drawCircle(
-                    color = TextGray.copy(alpha = 0.2f),
-                    style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round)
+                drawCircle(color = TextGray.copy(alpha = 0.2f), style = Stroke(width = 6.dp.toPx()))
+                drawArc(
+                    color = if (isInternet) Color.Red else KhufashPrimary, // الدائرة الحمراء
+                    startAngle = -90f,
+                    sweepAngle = 360 * percentage,
+                    useCenter = false,
+                    style = Stroke(6.dp.toPx(), cap = StrokeCap.Round)
                 )
             }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(value, color = TextWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Text(unit, color = TextGray, fontSize = 10.sp)
+            Text(displayValue, color = TextWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HeaderSection(name: String, phone: String, balance: String, onSwitchClick: () -> Unit, onRefresh: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(color = KhufashSurface, shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
+            .padding(top = 48.dp, bottom = 32.dp, start = 24.dp, end = 24.dp)
+    ) {
+        Column {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(50.dp).clip(CircleShape).background(KhufashPrimary.copy(0.2f)), contentAlignment = Alignment.Center) {
+                        Text(text = if (name.isNotEmpty()) name.take(1) else "س", color = KhufashPrimary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text("مرحباً،", color = TextGray, fontSize = 14.sp)
+                        Text(name, color = TextWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Surface(onClick = onSwitchClick, shape = RoundedCornerShape(16.dp), color = KhufashBackground.copy(0.5f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                        Text(text = phone, color = TextWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Icon(Icons.Default.ArrowDropDown, null, tint = TextWhite, modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(32.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+                Column {
+                    Text("الرصيد الأساسي", color = TextGray, fontSize = 14.sp)
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(balance, color = TextWhite, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+                        Text(" SDG", color = TextGray, fontSize = 14.sp, modifier = Modifier.padding(bottom = 6.dp))
+                    }
+                }
+                IconButton(onClick = onRefresh, modifier = Modifier.background(KhufashPrimary, CircleShape)) {
+                    Icon(Icons.Default.Refresh, null, tint = Color.White)
+                }
             }
         }
     }
@@ -332,51 +236,38 @@ fun UsageCircleIndicator(title: String, value: String, unit: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoyaltyPointsCard(points: String) {
+fun LoyaltyPointsCard(points: String, onClaimClick: () -> Unit) {
     Card(
-        onClick = { /* التنقل لصفحة النقاط */ },
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+        onClick = onClaimClick,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         colors = CardDefaults.cardColors(containerColor = KhufashAccent),
         shape = RoundedCornerShape(24.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(Color.White),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Star, contentDescription = null, tint = KhufashAccent)
+                Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Star, null, tint = KhufashAccent)
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
-                    Text("برنامج الولاء (الخفاش)", color = Color.Black.copy(alpha = 0.7f), fontSize = 14.sp)
+                    Text("برنامج الولاء (الخفاش)", color = Color.Black.copy(0.7f), fontSize = 14.sp)
                     Text("$points نقطة", color = Color.Black, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 }
             }
-            
-            Surface(
-                color = Color.Black.copy(alpha = 0.1f),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Text(
-                    text = "الكل",
-                    color = Color.Black,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp
-                )
-            }
+            Icon(Icons.Default.KeyboardArrowLeft, null, tint = Color.Black)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun QuickActionBtn(title: String, subtitle: String, icon: ImageVector, modifier: Modifier, onClick: () -> Unit) {
+    Card(onClick = onClick, modifier = modifier.height(100.dp), colors = CardDefaults.cardColors(containerColor = KhufashSurface), shape = RoundedCornerShape(20.dp)) {
+        Column(modifier = Modifier.fillMaxSize().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Icon(icon, null, tint = KhufashPrimary, modifier = Modifier.size(28.dp))
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(title, color = TextWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text(subtitle, color = KhufashAccent, fontSize = 11.sp)
         }
     }
 }
