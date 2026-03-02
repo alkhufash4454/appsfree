@@ -35,26 +35,27 @@ import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
 
-    // مسجل طلب الصلاحية
+    // مسجل طلب الصلاحية للتعامل مع أندرويد 13+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (isGranted) {
             Toast.makeText(this, "تم تفعيل إشعارات الخفاش 🦇", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "لن تصلك إشعارات التجميع التلقائي", Toast.LENGTH_LONG).show()
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // 1. طلب الصلاحية يدويًا
+        // 1. طلب صلاحية الإشعارات يدوياً
         askNotificationPermission()
 
-        // 2. جدولة التجميع التلقائي
+        // 2. جدولة التجميع التلقائي (الساعة 2:01 صباحاً)
         scheduleDailyClaim(this)
 
         setContent {
-            // الحل الجذري: تأكد أن KhufashTheme معرفة هنا أو استبدلها بـ SudaniAppTheme
             KhufashTheme { 
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -68,7 +69,7 @@ class MainActivity : ComponentActivity() {
 
     private fun askNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // تصحيح الخطأ الإملائي: POST_NOTIFICATIONS بدلاً من POST_NOT_NOTIFICATIONS
+            // التحقق من الصلاحية قبل الطلب
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
                 PackageManager.PERMISSION_GRANTED
             ) {
@@ -81,6 +82,7 @@ class MainActivity : ComponentActivity() {
         val calendar = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 2)
             set(Calendar.MINUTE, 1)
+            set(Calendar.SECOND, 0)
             if (before(Calendar.getInstance())) {
                 add(Calendar.DAY_OF_MONTH, 1)
             }
@@ -88,9 +90,14 @@ class MainActivity : ComponentActivity() {
 
         val timeDiff = calendar.timeInMillis - System.currentTimeMillis()
 
+        // إعداد طلب العمل الدوري للتجميع
         val claimRequest = PeriodicWorkRequestBuilder<ClaimWorker>(24, TimeUnit.HOURS)
             .setInitialDelay(timeDiff, TimeUnit.MILLISECONDS)
-            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .build()
+            )
             .build()
 
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
@@ -101,7 +108,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// تعريف الثيم مباشرة لحل مشكلة Unresolved reference
 @Composable
 fun KhufashTheme(content: @Composable () -> Unit) {
     val colorScheme = darkColorScheme(
@@ -122,6 +128,7 @@ fun AppNavigation(viewModel: SudaniViewModel = viewModel()) {
     val context = LocalContext.current
 
     LaunchedEffect(uiState) {
+        // حل مشكلة الـ Smart Cast باستخدام متغير محلي ثابت
         val currentState = uiState 
         when (currentState) {
             is UiState.Success -> Toast.makeText(context, currentState.message, Toast.LENGTH_SHORT).show()
@@ -137,7 +144,6 @@ fun AppNavigation(viewModel: SudaniViewModel = viewModel()) {
     }
 }
 
-// الحل الجذري: تعريف شاشة الدخول هنا لضمان وجود المرجع
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(viewModel: SudaniViewModel) {
@@ -150,30 +156,38 @@ fun LoginScreen(viewModel: SudaniViewModel) {
         verticalArrangement = Arrangement.Center
     ) {
         Text("تطبيق الخفاش 🦇", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = KhufashPrimary)
+        Text("سجل دخولك لإدارة أرقامك", fontSize = 14.sp, color = TextGray)
+        
         Spacer(modifier = Modifier.height(48.dp))
 
         if (!viewModel.isOtpSent) {
             OutlinedTextField(
                 value = viewModel.msisdn,
                 onValueChange = { if (it.length <= 10) viewModel.msisdn = it },
-                label = { Text("رقم الهاتف") },
+                label = { Text("رقم الهاتف (سوداني)") },
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                singleLine = true
+                singleLine = true,
+                colors = TextFieldDefaults.outlinedTextFieldColors(
+                    focusedBorderColor = KhufashPrimary,
+                    unfocusedBorderColor = TextGray,
+                    cursorColor = KhufashPrimary
+                )
             )
             Spacer(modifier = Modifier.height(24.dp))
             Button(
                 onClick = { viewModel.sendOtp() },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = KhufashPrimary)
             ) {
-                Text("إرسال رمز التحقق")
+                Text("إرسال رمز التحقق", fontWeight = FontWeight.Bold)
             }
         } else {
             OutlinedTextField(
                 value = viewModel.otp,
                 onValueChange = { viewModel.otp = it },
-                label = { Text("رمز التحقق") },
+                label = { Text("رمز التحقق (6 أرقام)") },
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true
@@ -185,7 +199,11 @@ fun LoginScreen(viewModel: SudaniViewModel) {
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen)
             ) {
-                Text("تأكيد الدخول")
+                Text("تأكيد وتسجيل الدخول", fontWeight = FontWeight.Bold)
+            }
+            
+            TextButton(onClick = { viewModel.isOtpSent = false }) {
+                Text("تغيير الرقم؟", color = TextGray)
             }
         }
     }
