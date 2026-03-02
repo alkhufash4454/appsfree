@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    package="com.sudani.app">
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -50,11 +49,12 @@
                 android:value="androidx.startup" />
         </provider>
 
-        <receiver android:name="androidx.work.impl.background.systemalarm.RescheduleReceiver"
+        <receiver 
+            android:name="androidx.work.impl.background.systemalarm.RescheduleReceiver"
             android:enabled="true"
             android:exported="false"
-            android:directBootAware="false">
-            <intent-filter>
+            android:directBootAware="false"
+            tools:replace="android:enabled"> <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.TIME_SET" />
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
