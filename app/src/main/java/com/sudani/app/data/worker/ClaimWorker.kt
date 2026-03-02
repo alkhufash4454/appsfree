@@ -8,7 +8,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.google.gson.Gson
@@ -27,7 +26,7 @@ class ClaimWorker(appContext: Context, workerParams: WorkerParameters) :
     private val gson = Gson()
 
     override suspend fun doWork(): Result = coroutineScope {
-        // جلب قائمة الأرقام المحفوظة
+        // 1. جلب قائمة الحسابات الـ 10 المحفوظة بكامل بياناتها
         val json = sharedPrefs.getString("accounts_list", null) ?: return@coroutineScope Result.success()
         val type = object : TypeToken<List<OnboardingData>>() {}.type
         val accounts: List<OnboardingData> = gson.fromJson(json, type)
@@ -35,24 +34,39 @@ class ClaimWorker(appContext: Context, workerParams: WorkerParameters) :
         var totalGained = 0
         var successCount = 0
 
-        // تنفيذ التجميع للأرقام
+        // 2. تنفيذ التجميع المتوازي للأرقام لضمان السرعة
         val tasks = accounts.map { account ->
             async {
                 try {
-                    val claimResponse = repository.claimPoints(account.customerId ?: "", account.token ?: "", "0")
-                    if (claimResponse.isSuccessful) {
+                    val msisdn = account.customerId ?: ""
+                    val token = account.token ?: ""
+                    
+                    // إرسال طلب التجميع بالهيدرز الكاملة لمحاكاة البوت
+                    val claimResponse = repository.claimPoints(
+                        msisdn = msisdn,
+                        token = token,
+                        userData = account, // تمرير الكائن الكامل لضمان الهيدرز الصحيحة
+                        currentPoints = "0" // السيرفر يقبل 0 كقيمة افتراضية للبدء
+                    )
+
+                    if (claimResponse.isSuccessful && claimResponse.body()?.responseCode == "200") {
                         successCount++
-                        totalGained += 10
+                        totalGained += 10 // القيمة المكتسبة الافتراضية لكل رقم
                     }
-                } catch (e: Exception) { }
+                } catch (e: Exception) {
+                    // فشل تجميع رقم واحد لا يعطل البقية
+                }
             }
         }
+
+        // انتظار اكتمال كافة العمليات
         tasks.awaitAll()
 
-        // إرسال الإشعار في حالة النجاح
+        // 3. إظهار إشعار "الخفاش" في حالة نجاح أي رقم
         if (successCount > 0) {
             showNotification(successCount, totalGained)
         }
+        
         Result.success()
     }
 
@@ -60,24 +74,31 @@ class ClaimWorker(appContext: Context, workerParams: WorkerParameters) :
         val channelId = "khufash_claim"
         val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        // إنشاء القناة لأندرويد 8 وما فوق
+        // إنشاء قناة الإشعارات لأندرويد 8 وما فوق
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(channelId, "تجميع الخفاش", NotificationManager.IMPORTANCE_DEFAULT)
+            val channel = NotificationChannel(
+                channelId, 
+                "تجميع الخفاش 🦇", 
+                NotificationManager.IMPORTANCE_DEFAULT
+            )
             notificationManager.createNotificationChannel(channel)
         }
 
+        // بناء محتوى الإشعار الاحترافي
         val notification = NotificationCompat.Builder(applicationContext, channelId)
-            .setSmallIcon(android.R.drawable.star_on) // يفضل استبدالها بأيقونة التطبيق لاحقاً
+            .setSmallIcon(android.R.drawable.star_on) 
             .setContentTitle("🦇 تم تجميع نقاط الخفاش")
             .setContentText("نجح التجميع لـ $count أرقام. الإجمالي المكتسب: +$points نقطة")
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .build()
 
-        // حل مشكلة الـ Lint: فحص الصلاحية لأندرويد 13 (API 33) وما فوق
+        // التحقق من صلاحيات أندرويد 13 فما فوق قبل الإرسال
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ActivityCompat.checkSelfPermission(applicationContext, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                // إذا لم تكن الصلاحية موجودة، نتجاهل الإرسال (أو نطلبها من الشاشة الرئيسية)
+            if (ActivityCompat.checkSelfPermission(
+                    applicationContext, 
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED) {
                 return 
             }
         }
