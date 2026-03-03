@@ -13,9 +13,11 @@ import kotlinx.coroutines.launch
 class SudaniViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = SudaniRepository()
     
+    // إدارة حالة الواجهة لرسائل النجاح والفشل
     private val _uiState = MutableStateFlow<UiState>(UiState.Idle)
     val uiState = _uiState.asStateFlow()
 
+    // متغيرات الحالة المطلوبة في MainActivity والـ Screens
     var isLoggedIn by mutableStateOf(false)
     var isOtpSent by mutableStateOf(false)
     var msisdn by mutableStateOf("")
@@ -25,6 +27,7 @@ class SudaniViewModel(application: Application) : AndroidViewModel(application) 
     var dashboardData by mutableStateOf<DashboardData?>(null)
     var savedAccounts by mutableStateOf<List<OnboardingData>>(emptyList())
 
+    // قائمة الخدمات الـ 15 المتطابقة مع البوت
     val allServices = listOf(
         ServiceOffering("243586", "Ahla Youm", "Mixed", "2000", "100", "300", "1570"),
         ServiceOffering("237602", "Raih Balak", "Mixed", "1000", "50", "100", "1699"),
@@ -43,69 +46,75 @@ class SudaniViewModel(application: Application) : AndroidViewModel(application) 
         ServiceOffering("239706", "1GB", "Data", "10304", "0", "1024", "2007")
     )
 
+    // إرسال OTP -
     fun sendOtp() {
         viewModelScope.launch {
             _uiState.value = UiState.Loading
             try {
                 val res = repository.generateOtp(msisdn)
-                if (res.isSuccessful) {
+                if (res.isSuccessful && res.body()?.responseCode == "200") {
                     isOtpSent = true
-                    _uiState.value = UiState.Success("تم إرسال الرمز بنجاح")
+                    _uiState.value = UiState.Success("تم إرسال الرمز بنجاح 🦇")
                 } else {
-                    _uiState.value = UiState.Error("فشل إرسال الرمز")
+                    _uiState.value = UiState.Error(res.body()?.responseMessage ?: "فشل إرسال الرمز")
                 }
             } catch (e: Exception) {
-                _uiState.value = UiState.Error("خطأ في الاتصال")
+                _uiState.value = UiState.Error("خطأ في الاتصال بالشبكة")
             }
         }
     }
 
+    // التحقق من OTP وإكمال التسجيل -
     fun verifyOtp() {
         viewModelScope.launch {
             _uiState.value = UiState.Loading
             try {
                 val res = repository.completeOnboarding(msisdn, otp)
-                if (res.isSuccessful) {
+                if (res.isSuccessful && res.body()?.responseCode == "200") {
                     fullUserData = res.body()?.data
                     token = fullUserData?.token
                     isLoggedIn = true
-                    fetchDashboard()
-                    _uiState.value = UiState.Success("تم تسجيل الدخول")
+                    fetchDashboard() // تحديث البيانات فوراً بعد الدخول
+                    _uiState.value = UiState.Success("تم تسجيل دخول الخفاش بنجاح 🦇")
                 } else {
-                    _uiState.value = UiState.Error("رمز التحقق غير صحيح")
+                    _uiState.value = UiState.Error(res.body()?.responseMessage ?: "رمز التحقق خطأ")
                 }
             } catch (e: Exception) {
-                _uiState.value = UiState.Error("خطأ في التحقق")
+                _uiState.value = UiState.Error("خطأ في عملية التحقق")
             }
         }
     }
 
+    // جلب بيانات لوحة التحكم (الاسم، الرصيد، النقاط) -
     fun fetchDashboard() {
         val currentToken = token ?: return
         val userData = fullUserData ?: return
         viewModelScope.launch {
             try {
                 val res = repository.getDashboard(msisdn, currentToken, userData)
-                if (res.isSuccessful) {
+                if (res.isSuccessful && res.body()?.responseCode == "200") {
                     dashboardData = res.body()?.data
                 }
             } catch (e: Exception) {}
         }
     }
 
+    // تجميع النقاط يدوياً -
     fun claimPointsManual() {
         val currentToken = token ?: return
         val userData = fullUserData ?: return
+        // معالجة النقاط الحالية كعدد صحيح لضمان قبول السيرفر
         val points = dashboardData?.totalLoyaltyPoints?.split(".")?.get(0) ?: "0"
+        
         viewModelScope.launch {
             _uiState.value = UiState.Loading
             try {
                 val res = repository.claimPoints(msisdn, currentToken, userData, points)
-                if (res.isSuccessful) {
-                    _uiState.value = UiState.Success("تم تجميع النقاط 🦇")
+                if (res.isSuccessful && res.body()?.responseCode == "200") {
+                    _uiState.value = UiState.Success("تم تجميع نقاط الخفاش 🦇")
                     fetchDashboard()
                 } else {
-                    _uiState.value = UiState.Error("فشل التجميع")
+                    _uiState.value = UiState.Error(res.body()?.responseMessage ?: "تنبيه: أخذتها مسبقاً")
                 }
             } catch (e: Exception) {
                 _uiState.value = UiState.Error("خطأ في الشبكة")
@@ -113,25 +122,28 @@ class SudaniViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // تفعيل عروض النقاط (300MB / 1GB) -
     fun activateKhufashOffer(type: String) {
         val currentToken = token ?: return
+        val userData = fullUserData ?: return
         val currentPoints = dashboardData?.totalLoyaltyPoints?.split(".")?.get(0) ?: "0"
         
-        val (offerId, productId, pointsNeeded) = when(type) {
-            "300mb" -> Triple(SudaniConfig.OFFER_300MB_ID, SudaniConfig.OFFER_300MB_PRODUCT_ID, "70")
-            "1gb" -> Triple(SudaniConfig.OFFER_1GB_ID, SudaniConfig.OFFER_1GB_PRODUCT_ID, "100")
+        val (offerId, productId, pointsNeeded, vol) = when(type) {
+            "300mb" -> Triple(SudaniConfig.OFFER_300MB_ID, SudaniConfig.OFFER_300MB_PRODUCT_ID, "70") to "300"
+            "1gb" -> Triple(SudaniConfig.OFFER_1GB_ID, SudaniConfig.OFFER_1GB_PRODUCT_ID, "100") to "1024"
             else -> return
         }
 
         viewModelScope.launch {
             _uiState.value = UiState.Loading
             try {
-                val res = repository.redeemOffer(msisdn, currentToken, offerId, productId, pointsNeeded, currentPoints)
-                if (res.isSuccessful) {
+                // استدعاء دالة الـ Redeem المتوافقة مع البوت
+                val res = repository.redeemPointsOffer(msisdn, currentToken, userData, currentPoints, offerId.first, offerId.second, offerId.third)
+                if (res.isSuccessful && res.body()?.responseCode == "200") {
                     _uiState.value = UiState.Success("تم تفعيل العرض بنجاح 🦇")
                     fetchDashboard()
                 } else {
-                    _uiState.value = UiState.Error("فشل التفعيل: نقاط غير كافية")
+                    _uiState.value = UiState.Error(res.body()?.responseMessage ?: "نقاطك لا تكفي")
                 }
             } catch (e: Exception) {
                 _uiState.value = UiState.Error("خطأ في الشبكة")
@@ -139,20 +151,23 @@ class SudaniViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // تفعيل الخدمات بالرصيد النقدي -
     fun subscribeWithBalance(service: ServiceOffering) {
         val currentToken = token ?: return
+        val userData = fullUserData ?: return
         viewModelScope.launch {
             _uiState.value = UiState.Loading
             try {
-                val res = repository.subscribeService(msisdn, currentToken, service.offeringId, service.price)
-                if (res.isSuccessful) {
-                    _uiState.value = UiState.Success("تم تفعيل ${service.name} بنجاح")
+                // معالجة كود 502 للرصيد غير الكافي
+                val res = repository.subscribeToService(msisdn, currentToken, userData, service)
+                if (res.isSuccessful && res.body()?.responseCode == "200") {
+                    _uiState.value = UiState.Success("تم تفعيل ${service.name} بنجاح 🦇")
                     fetchDashboard()
                 } else {
-                    _uiState.value = UiState.Error("فشل التفعيل: رصيد غير كافٍ")
+                    _uiState.value = UiState.Error("فشل: رصيد نقدي غير كافٍ (502)")
                 }
             } catch (e: Exception) {
-                _uiState.value = UiState.Error("خطأ في الاتصال")
+                _uiState.value = UiState.Error("خطأ في الاتصال بالسيرفر")
             }
         }
     }
@@ -168,5 +183,6 @@ class SudaniViewModel(application: Application) : AndroidViewModel(application) 
     fun logout() {
         isLoggedIn = false
         isOtpSent = false
+        dashboardData = null
     }
 }
