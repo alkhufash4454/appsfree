@@ -26,7 +26,7 @@ class ClaimWorker(appContext: Context, workerParams: WorkerParameters) :
     private val gson = Gson()
 
     override suspend fun doWork(): Result = coroutineScope {
-        // 1. جلب قائمة الحسابات الـ 10 المحفوظة بكامل بياناتها
+        // 1. جلب قائمة الحسابات الـ 10 المحفوظة
         val json = sharedPrefs.getString("accounts_list", null) ?: return@coroutineScope Result.success()
         val type = object : TypeToken<List<OnboardingData>>() {}.type
         val accounts: List<OnboardingData> = gson.fromJson(json, type)
@@ -34,35 +34,38 @@ class ClaimWorker(appContext: Context, workerParams: WorkerParameters) :
         var totalGained = 0
         var successCount = 0
 
-        // 2. تنفيذ التجميع المتوازي للأرقام لضمان السرعة
+        // 2. تنفيذ التجميع المتوازي (نفس منطق البوت لمحاكاة السرعة)
         val tasks = accounts.map { account ->
             async {
                 try {
                     val msisdn = account.customerId ?: ""
                     val token = account.token ?: ""
                     
-                    // إرسال طلب التجميع بالهيدرز الكاملة لمحاكاة البوت
+                    // ملاحظة جذرية: السيرفر يحتاج نقاط صحيحة بدون كسور
+                    // إذا كان الحساب جديداً نرسل "0"
+                    val pointsToPass = "0" 
+
+                    // إرسال طلب التجميع بالهيدرز الكاملة
                     val claimResponse = repository.claimPoints(
                         msisdn = msisdn,
                         token = token,
-                        userData = account, // تمرير الكائن الكامل لضمان الهيدرز الصحيحة
-                        currentPoints = "0" // السيرفر يقبل 0 كقيمة افتراضية للبدء
+                        userData = account,
+                        points = pointsToPass // تم تعديل المسمى ليتطابق مع الـ Repository
                     )
 
                     if (claimResponse.isSuccessful && claimResponse.body()?.responseCode == "200") {
                         successCount++
-                        totalGained += 10 // القيمة المكتسبة الافتراضية لكل رقم
+                        totalGained += 10 
                     }
                 } catch (e: Exception) {
-                    // فشل تجميع رقم واحد لا يعطل البقية
+                    // فشل رقم لا يؤثر على البقية
                 }
             }
         }
 
-        // انتظار اكتمال كافة العمليات
         tasks.awaitAll()
 
-        // 3. إظهار إشعار "الخفاش" في حالة نجاح أي رقم
+        // 3. إظهار الإشعار الاحترافي
         if (successCount > 0) {
             showNotification(successCount, totalGained)
         }
@@ -74,7 +77,6 @@ class ClaimWorker(appContext: Context, workerParams: WorkerParameters) :
         val channelId = "khufash_claim"
         val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        // إنشاء قناة الإشعارات لأندرويد 8 وما فوق
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId, 
@@ -84,7 +86,6 @@ class ClaimWorker(appContext: Context, workerParams: WorkerParameters) :
             notificationManager.createNotificationChannel(channel)
         }
 
-        // بناء محتوى الإشعار الاحترافي
         val notification = NotificationCompat.Builder(applicationContext, channelId)
             .setSmallIcon(android.R.drawable.star_on) 
             .setContentTitle("🦇 تم تجميع نقاط الخفاش")
@@ -93,7 +94,6 @@ class ClaimWorker(appContext: Context, workerParams: WorkerParameters) :
             .setAutoCancel(true)
             .build()
 
-        // التحقق من صلاحيات أندرويد 13 فما فوق قبل الإرسال
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ActivityCompat.checkSelfPermission(
                     applicationContext, 
