@@ -26,7 +26,6 @@ class ClaimWorker(appContext: Context, workerParams: WorkerParameters) :
     private val gson = Gson()
 
     override suspend fun doWork(): Result = coroutineScope {
-        // 1. جلب قائمة الحسابات الـ 10 المحفوظة
         val json = sharedPrefs.getString("accounts_list", null) ?: return@coroutineScope Result.success()
         val type = object : TypeToken<List<OnboardingData>>() {}.type
         val accounts: List<OnboardingData> = gson.fromJson(json, type)
@@ -34,39 +33,38 @@ class ClaimWorker(appContext: Context, workerParams: WorkerParameters) :
         var totalGained = 0
         var successCount = 0
 
-        // 2. تنفيذ التجميع المتوازي (محاكاة منطق البوت لضمان السرعة)
         val tasks = accounts.map { account ->
             async {
                 try {
                     val msisdn = account.customerId ?: ""
                     val token = account.token ?: ""
                     
-                    // السيرفر يحتاج قيمة النقاط الحالية كـ String (بدون كسور)
-                    // في التجميع التلقائي نرسل "0" كبداية إذا لم تتوفر القيمة المحدثة
-                    val lastPoints = "0" 
+                    // 1. جلب الداشبورد أولاً لمعرفة النقاط الحالية (مهم جداً لنجاح طلب التجميع)
+                    val dashboardResponse = repository.getDashboard(msisdn, token, account)
+                    val currentPoints = if (dashboardResponse.isSuccessful) {
+                        dashboardResponse.body()?.data?.totalLoyaltyPoints?.split(".")?.get(0) ?: "0"
+                    } else {
+                        "0"
+                    }
 
-                    // استدعاء التجميع بالهيدرز الكاملة
+                    // 2. استدعاء التجميع
                     val claimResponse = repository.claimPoints(
                         msisdn = msisdn,
                         token = token,
                         userData = account,
-                        points = lastPoints // تم توحيد المسمى مع الـ Repository
+                        points = currentPoints
                     )
 
                     if (claimResponse.isSuccessful && claimResponse.body()?.responseCode == "200") {
                         successCount++
                         totalGained += 10 
                     }
-                } catch (e: Exception) {
-                    // فشل حساب واحد لا يعطل البقية
-                }
+                } catch (e: Exception) {}
             }
         }
 
-        // انتظار اكتمال التجميع لجميع الأرقام
         tasks.awaitAll()
 
-        // 3. إظهار إشعار الخفاش النهائي
         if (successCount > 0) {
             showNotification(successCount, totalGained)
         }
@@ -78,7 +76,6 @@ class ClaimWorker(appContext: Context, workerParams: WorkerParameters) :
         val channelId = "khufash_claim"
         val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        // إنشاء قناة الإشعارات لأندرويد 8.0+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId, 
@@ -88,7 +85,6 @@ class ClaimWorker(appContext: Context, workerParams: WorkerParameters) :
             notificationManager.createNotificationChannel(channel)
         }
 
-        // بناء الإشعار
         val notification = NotificationCompat.Builder(applicationContext, channelId)
             .setSmallIcon(android.R.drawable.star_on) 
             .setContentTitle("🦇 تم تجميع نقاط الخفاش")
@@ -97,7 +93,6 @@ class ClaimWorker(appContext: Context, workerParams: WorkerParameters) :
             .setAutoCancel(true)
             .build()
 
-        // التحقق من صلاحيات الإشعارات لأندرويد 13+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ActivityCompat.checkSelfPermission(
                     applicationContext, 
