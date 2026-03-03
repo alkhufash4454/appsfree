@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sudani.app.ui.theme.*
-import com.sudani.app.viewmodel.ServiceOffering
+import com.sudani.app.data.model.ServiceOffering // الاستيراد الجذري المصلح
 import com.sudani.app.viewmodel.SudaniViewModel
 
 @Composable
@@ -60,12 +60,12 @@ fun ServicesScreenKhufash(viewModel: SudaniViewModel = viewModel()) {
             containerColor = KhufashBackground,
             contentColor = KhufashPrimary,
             indicator = { tabPositions ->
-                TabRowDefaults.Indicator(
+                TabRowDefaults.SecondaryIndicator( // تم التعديل ليتوافق مع Material3 الحديثة
                     Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
                     color = KhufashPrimary
                 )
             },
-            divider = { Divider(color = KhufashSurface) }
+            divider = { HorizontalDivider(color = KhufashSurface) } // تم التعديل لـ HorizontalDivider
         ) {
             tabs.forEachIndexed { index, title ->
                 Tab(
@@ -129,7 +129,8 @@ fun KhufashServiceCard(service: ServiceOffering, onSubscribe: () -> Unit) {
                             Icon(Icons.Default.Public, null, tint = TextGray, modifier = Modifier.size(24.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
-                                val displayMb = if (service.dataMb.toInt() >= 1024) "${service.dataMb.toInt()/1024} GB" else "${service.dataMb} MB"
+                                val dataVal = service.dataMb.toIntOrNull() ?: 0
+                                val displayMb = if (dataVal >= 1024) "${dataVal/1024} GB" else "$dataVal MB"
                                 Text(displayMb, color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                                 Text("إنترنت", color = TextGray, fontSize = 11.sp)
                             }
