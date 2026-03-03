@@ -28,21 +28,19 @@ import androidx.work.*
 import com.sudani.app.ui.screens.KhufashMainScreen
 import com.sudani.app.ui.theme.*
 import com.sudani.app.viewmodel.SudaniViewModel
-import com.sudani.app.viewmodel.UiState
+import com.sudani.app.data.model.UiState // الاستيراد الصحيح للموديل الموحد
 import com.sudani.app.data.worker.ClaimWorker
 import java.util.*
 import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
 
-    // مسجل طلب الصلاحية للتعامل مع أندرويد 13+
+    // مسجل طلب الصلاحية للتعامل مع أندرويد 13+ لضمان وصول تقارير التجميع
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (isGranted) {
             Toast.makeText(this, "تم تفعيل إشعارات الخفاش 🦇", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(this, "لن تصلك إشعارات التجميع التلقائي", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -52,7 +50,7 @@ class MainActivity : ComponentActivity() {
         // 1. طلب صلاحية الإشعارات يدوياً
         askNotificationPermission()
 
-        // 2. جدولة التجميع التلقائي (الساعة 2:01 صباحاً)
+        // 2. جدولة التجميع التلقائي (الساعة 2:01 صباحاً) كما في منطق البوت
         scheduleDailyClaim(this)
 
         setContent {
@@ -69,7 +67,6 @@ class MainActivity : ComponentActivity() {
 
     private fun askNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // التحقق من الصلاحية قبل الطلب
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
                 PackageManager.PERMISSION_GRANTED
             ) {
@@ -81,7 +78,7 @@ class MainActivity : ComponentActivity() {
     private fun scheduleDailyClaim(context: android.content.Context) {
         val calendar = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 2)
-            set(Calendar.MINUTE, 1)
+            set(Calendar.MINUTE, 1) // الالتزام بتوقيت البوت الدقيق
             set(Calendar.SECOND, 0)
             if (before(Calendar.getInstance())) {
                 add(Calendar.DAY_OF_MONTH, 1)
@@ -90,7 +87,7 @@ class MainActivity : ComponentActivity() {
 
         val timeDiff = calendar.timeInMillis - System.currentTimeMillis()
 
-        // إعداد طلب العمل الدوري للتجميع
+        // إعداد طلب العمل الدوري للتجميع لجميع الحسابات الـ 10
         val claimRequest = PeriodicWorkRequestBuilder<ClaimWorker>(24, TimeUnit.HOURS)
             .setInitialDelay(timeDiff, TimeUnit.MILLISECONDS)
             .setConstraints(
@@ -124,19 +121,19 @@ fun KhufashTheme(content: @Composable () -> Unit) {
 
 @Composable
 fun AppNavigation(viewModel: SudaniViewModel = viewModel()) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsState() // مراقبة حالة الـ API
     val context = LocalContext.current
 
+    // معالجة ردود السيرفر (نجاح/خطأ) بشكل تلقائي
     LaunchedEffect(uiState) {
-        // حل مشكلة الـ Smart Cast باستخدام متغير محلي ثابت
-        val currentState = uiState 
-        when (currentState) {
+        when (val currentState = uiState) {
             is UiState.Success -> Toast.makeText(context, currentState.message, Toast.LENGTH_SHORT).show()
             is UiState.Error -> Toast.makeText(context, currentState.message, Toast.LENGTH_LONG).show()
             else -> {}
         }
     }
 
+    // التبديل التلقائي بين شاشة الدخول والداشبورد
     if (!viewModel.isLoggedIn) {
         LoginScreen(viewModel)
     } else {
@@ -160,6 +157,7 @@ fun LoginScreen(viewModel: SudaniViewModel) {
         
         Spacer(modifier = Modifier.height(48.dp))
 
+        // منطق تدفق المصادقة المتطابق مع البوت
         if (!viewModel.isOtpSent) {
             OutlinedTextField(
                 value = viewModel.msisdn,
@@ -176,7 +174,7 @@ fun LoginScreen(viewModel: SudaniViewModel) {
             )
             Spacer(modifier = Modifier.height(24.dp))
             Button(
-                onClick = { viewModel.sendOtp() },
+                onClick = { viewModel.sendOtp() }, // استدعاء الدالة من الـ ViewModel
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = KhufashPrimary)
@@ -194,7 +192,7 @@ fun LoginScreen(viewModel: SudaniViewModel) {
             )
             Spacer(modifier = Modifier.height(24.dp))
             Button(
-                onClick = { viewModel.verifyOtp() },
+                onClick = { viewModel.verifyOtp() }, // إكمال الـ Onboarding
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen)
