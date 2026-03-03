@@ -2,37 +2,21 @@ package com.sudani.app.data.model
 
 import com.google.gson.annotations.SerializedName
 
-/**
- * الموديل العام للردود من سيرفر سوداني
- * [span_0](start_span)يغلف كافة البيانات المستلمة مع كود الحالة والرسالة[span_0](end_span)
- */
 data class SudaniResponse<T>(
     @SerializedName("responseCode") val responseCode: String,
     @SerializedName("responseMessage") val responseMessage: String?,
     @SerializedName("data") val data: T?
 )
 
-/**
- * بيانات لوحة التحكم (Dashboard)
- * [span_1](start_span)تم تحديثها لتشمل الوحدات المجانية (Free Units) لحساب حجم الإنترنت المتبقي[span_1](end_span)
- */
 data class DashboardData(
     @SerializedName("subscriberId") val subscriberId: String?,
     @SerializedName("customerName") val customerName: String?,
-    [span_2](start_span)// تم ضبطه كـ Any لأن السيرفر يرسله أحياناً كـ String وأحياناً كـ Object لضمان عدم توقف التطبيق[span_2](end_span)
     @SerializedName("balance") val balance: Any?, 
     @SerializedName("totalLoyaltyPoints") val totalLoyaltyPoints: String?,
-    @SerializedName("activeOffers") val activeOffers: List<ActiveOffer>?,
     @SerializedName("freeUnits") val freeUnits: List<FreeUnit>?,
-    @SerializedName("totalUsage") val totalUsage: String?,
-    @SerializedName("lastTopUpDate") val lastTopUpDate: String?,
-    @SerializedName("lastTopUpAmount") val lastTopUpAmount: String?
+    @SerializedName("activeOffers") val activeOffers: List<ActiveOffer>?
 )
 
-/**
- * تفاصيل الباقات النشطة (إنترنت، دقائق، رسائل)
- * [span_3](start_span)تستخدم لرسم "الدائرة الحمراء" وحساب النسب المئوية للاستهلاك[span_3](end_span)
- */
 data class FreeUnit(
     @SerializedName("unitName") val unitName: String?,
     @SerializedName("currentAmount") val currentAmount: String?,
@@ -46,88 +30,33 @@ data class ActiveOffer(
     @SerializedName("remainingVolume") val remainingVolume: String?
 )
 
-/**
- * بيانات الجلسة والمشترك الكاملة
- * [span_4](start_span)تخزن في الذاكرة لضمان بقاء الحسابات متصلة وتعدد الأرقام[span_4](end_span)
- */
 data class OnboardingData(
     @SerializedName("token") val token: String?,
     @SerializedName("subscriberId") val subscriberId: String?,
     @SerializedName("customerId") val customerId: String?,
     @SerializedName("primaryOfferName") val primaryOfferName: String?,
     @SerializedName("firstName") val firstName: String?,
-    @SerializedName("lastName") val lastName: String?,
-    @SerializedName("creationTime") val creationTime: String?,
-    @SerializedName("subscriberType") val subscriberType: String?,
-    @SerializedName("pin1") val pin1: String?,
-    @SerializedName("puk1") val puk1: String?
+    @SerializedName("lastName") val lastName: String?
 )
 
-// --- موديلات الطلبات (Requests) لضمان تطابق الهيدرز مع منطق البوت ---
+data class OtpRequest(val msisdn: String, val primaryMsisdn: String)
+data class VerifyOtpRequest(val msisdn: String, val primaryMsisdn: String, val otp: String)
+data class ClaimPointsRequest(@SerializedName("Current-loyalty-points") val currentPoints: String)
 
-data class OtpRequest(
-    val msisdn: String,
-    val primaryMsisdn: String,
-    val email: String = "",
-    val method: String = "SMS",
-    val useCase: String = "ONBOARDING",
-    val platform: String = "android",
-    val language: String = "en"
-)
-
-data class VerifyOtpRequest(
-    val msisdn: String,
-    val primaryMsisdn: String,
-    val otp: String,
-    val method: String = "SMS",
-    val useCase: String = "ONBOARDING",
-    val channel: String = "sc_app",
-    val transactionToken: String = "abc",
-    val platform: String = "android",
-    val language: String = "en"
-)
-
-/**
- * طلب تجميع النقاط
- * [span_5](start_span)يستخدم الهيدر الخاص بالنقاط الحالية لضمان قبول السيرفر للطلب[span_5](end_span)
- */
-data class ClaimPointsRequest(
-    @SerializedName("Current-loyalty-points") val currentPoints: String,
-    val milestone: String = "NO",
-    val milestoneIdentifier: String = "1"
-)
-
-/**
- * طلب استبدال النقاط (300MB و 1GB)
- * [span_6](start_span)يتطلب مصفوفة موارد (resources) دقيقة جداً لنجاح العملية برمجياً[span_6](end_span)
- */
 data class RedeemOfferRequest(
-    val age: String = "1",
     val offerId: String,
     val productId: String,
     val loyaltyPoints: String,
     @SerializedName("Current-loyalty-points") val currentPoints: String,
-    val chosenReward: String = "Referral Gift",
-    val resources: List<OfferResource>,
-    val rewardTypes: String = "On Net Mins,SMS,MB"
+    val resources: List<OfferResource>
 )
 
-data class OfferResource(
-    val key: String,
-    val value: String,
-    val label: String,
-    val unit: String
-)
+data class OfferResource(val key: String, val value: String, val label: String, val unit: String)
 
-/**
- * موديل الاشتراك بالرصيد النقدي
- * [span_7](start_span)الحقول هنا مصممة لتعكس استجابة السيرفر في حال نقص الرصيد (كود 502)[span_7](end_span)
- */
 data class SubscribeServiceRequest(
     val offerId: String,
     @SerializedName("product-category") val productCategory: String,
     @SerializedName("product-price") val productPrice: String,
     @SerializedName("product-name") val productName: String,
-    @SerializedName("product-id") val productId: String,
-    val typeoftransaction: String = "subscription"
+    @SerializedName("product-id") val productId: String
 )
